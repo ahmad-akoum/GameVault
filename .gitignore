@@ -82,3 +82,7 @@ docs/screenshots/private/
 *.aab
 *.msix
 *.msi
+*.exe
+*.dll
+*.pdb
+*.obj
