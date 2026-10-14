@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/game.dart';
 import '../state/vault_controller.dart';
 import 'components.dart';
+import 'tracking_controls.dart';
 
 class DetailsPage extends StatefulWidget {
   const DetailsPage({
@@ -71,13 +72,15 @@ class _DetailsPageState extends State<DetailsPage> {
         const SizedBox(height: 8),
         Text(
           [
-            'Steam',
+            g.isManual ? 'Local game' : 'Steam',
             'Windows',
             if (g.release != null) g.release!,
             ...g.genres,
           ].join('  •  '),
           style: TextStyle(color: scheme.onSurfaceVariant),
         ),
+        const SizedBox(height: 22),
+        TrackingControls(controller: c, game: g),
         const SizedBox(height: 22),
         Wrap(
           spacing: 12,
@@ -112,7 +115,7 @@ class _DetailsPageState extends State<DetailsPage> {
               label: Text(g.favorite ? 'Favorited' : 'Favorite'),
             ),
             OutlinedButton.icon(
-              onPressed: c.busy.contains(g.appId)
+              onPressed: g.isManual || c.busy.contains(g.appId)
                   ? null
                   : () => c.refreshMetadata(g.appId),
               icon: const Icon(Icons.sync, size: 18),
@@ -277,8 +280,13 @@ class _DetailsPageState extends State<DetailsPage> {
         const SizedBox(height: 26),
         const Divider(),
         const SizedBox(height: 26),
-        const SectionTitle('Steam installation'),
-        _metadata(context, 'Steam AppID', '${g.appId}'),
+        const SectionTitle('Critic ratings'),
+        const Text(
+          'Ratings are not connected. An authorized Metacritic or OpenCritic data source is required; no score is inferred.',
+        ),
+        const SizedBox(height: 24),
+        SectionTitle(g.isManual ? 'Local installation' : 'Steam installation'),
+        if (!g.isManual) _metadata(context, 'Steam AppID', '${g.appId}'),
         if (g.developer != null) _metadata(context, 'Developer', g.developer!),
         if (g.publisher != null) _metadata(context, 'Publisher', g.publisher!),
         _metadata(context, 'Library folder', g.libraryPath),

@@ -10,20 +10,22 @@ ThemeData vaultTheme(Brightness brightness, int accent) {
       ? Color(accent)
       : seeded.primary;
   final scheme = seeded.copyWith(
-    surface: dark ? const Color(0xff17191d) : const Color(0xfff5f5f2),
+    surface: dark ? const Color(0xff101520) : const Color(0xfff5f5f2),
     onSurface: dark ? const Color(0xffe7e8eb) : const Color(0xff22252a),
     onSurfaceVariant: dark ? const Color(0xffa0a5ae) : const Color(0xff5b626a),
-    surfaceContainer: dark ? const Color(0xff202329) : const Color(0xffeaece8),
+    surfaceContainer: dark ? const Color(0xff182130) : const Color(0xffeaece8),
     surfaceContainerHighest: dark
-        ? const Color(0xff292d34)
+        ? const Color(0xff202c3d)
         : const Color(0xffe0e3dd),
     primary: primary,
     onPrimary: primary.computeLuminance() > 0.179
-        ? const Color(0xff17191d)
+        ? const Color(0xff101520)
         : Colors.white,
-    outlineVariant: dark ? const Color(0xff33373d) : const Color(0xffd4d8d1),
+    outlineVariant: dark ? const Color(0xff2b384b) : const Color(0xffd4d8d1),
   );
-  final radius = RoundedRectangleBorder(borderRadius: BorderRadius.circular(5));
+  final radius = RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(10),
+  );
   return ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
@@ -86,20 +88,20 @@ ThemeData vaultTheme(Brightness brightness, int accent) {
       fillColor: scheme.surfaceContainer,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(5),
+        borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide(color: scheme.outlineVariant),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(5),
+        borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide(color: scheme.outlineVariant),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(5),
+        borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide(color: scheme.primary, width: 1.5),
       ),
     ),
     dialogTheme: DialogThemeData(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       backgroundColor: scheme.surface,
     ),
     tooltipTheme: const TooltipThemeData(

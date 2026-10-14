@@ -236,18 +236,18 @@ class _GameTileState extends State<GameTile> {
               fit: StackFit.expand,
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(5),
+                  borderRadius: BorderRadius.circular(12),
                   child: GameArtwork(path: g.coverPath, title: g.title),
                 ),
                 Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(5),
+                    borderRadius: BorderRadius.circular(12),
                     onTap: widget.onOpen,
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 120),
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(5),
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: hover ? scheme.primary : Colors.transparent,
                           width: 2,

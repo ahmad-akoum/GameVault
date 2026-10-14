@@ -8,6 +8,7 @@ import 'services/local_store.dart';
 import 'services/steam_scanner.dart';
 import 'services/metadata_provider.dart';
 import 'services/hltb_provider.dart';
+import 'services/windows_games.dart';
 import 'state/vault_controller.dart';
 import 'ui/theme.dart';
 import 'ui/vault_shell.dart';
@@ -20,6 +21,7 @@ Future<void> main() async {
     minimumSize: Size(880, 620),
     center: true,
     title: 'GameVault',
+    titleBarStyle: TitleBarStyle.hidden,
     backgroundColor: Color(0xff17191d),
   );
   await windowManager.waitUntilReadyToShow(options, () async {
@@ -41,6 +43,7 @@ Future<void> main() async {
     scanner: SteamScanner(),
     metadata: SteamMetadataProvider(store.artwork),
     hltb: WebsiteHltbProvider(),
+    platform: WindowsGames(),
   );
   runApp(GameVaultApp(controller: controller));
   await controller.initialize();
@@ -100,6 +103,64 @@ class _GameVaultAppState extends State<GameVaultApp> with WindowListener {
           AppearanceMode.system => ThemeMode.system,
         },
         home: VaultShell(controller: widget.controller),
+        builder: widget.manageWindow
+            ? (context, child) => Column(
+                children: [
+                  Material(
+                    color: Theme.of(context).colorScheme.surface,
+                    child: SizedBox(
+                      height: 38,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: DragToMoveArea(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                ),
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  'GAMEVAULT  /  YOUR PERSONAL PLAY SPACE',
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    letterSpacing: 1.8,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Minimize',
+                            onPressed: windowManager.minimize,
+                            icon: const Icon(Icons.remove, size: 16),
+                          ),
+                          IconButton(
+                            tooltip: 'Maximize or restore',
+                            onPressed: () async {
+                              if (await windowManager.isMaximized()) {
+                                await windowManager.unmaximize();
+                              } else {
+                                await windowManager.maximize();
+                              }
+                            },
+                            icon: const Icon(Icons.crop_square, size: 15),
+                          ),
+                          IconButton(
+                            tooltip: 'Close GameVault',
+                            onPressed: windowManager.close,
+                            icon: const Icon(Icons.close, size: 17),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Expanded(child: child!),
+                ],
+              )
+            : null,
       );
     },
   );

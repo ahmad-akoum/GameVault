@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import '../models/game.dart';
 import '../state/vault_controller.dart';
 import 'components.dart';
+import 'tracking_controls.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({
@@ -29,6 +30,7 @@ class SettingsPage extends StatelessWidget {
     return ListView(
       children: [
         const PageHeading('Settings', 'Make GameVault feel at home.'),
+        TrackingSettings(controller: c),
         const SectionTitle('Appearance'),
         Row(
           children: [

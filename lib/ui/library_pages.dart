@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../models/game.dart';
 import '../state/vault_controller.dart';
 import 'components.dart';
+import 'activity_pages.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({
@@ -30,17 +31,28 @@ class HomePage extends StatelessWidget {
     }
     final playing = games.where((g) => g.status == GameStatus.playing).toList();
     final recent = [...games]..sort((a, b) => b.addedAt.compareTo(a.addedAt));
+    final recentlyPlayed =
+        games
+            .where((g) => controller.tracker.lastPlayed(g.appId) != null)
+            .toList()
+          ..sort(
+            (a, b) => controller.tracker
+                .lastPlayed(b.appId)!
+                .compareTo(controller.tracker.lastPlayed(a.appId)!),
+          );
     return ListView(
       children: [
         PageHeading(
           'Home',
-          'Your games. Your pace.',
+          'A good day for your next adventure.',
           action: OutlinedButton.icon(
             onPressed: onScan,
             icon: const Icon(Icons.add, size: 18),
             label: const Text('Add games'),
           ),
         ),
+        ActivitySummary(controller: controller),
+        const SizedBox(height: 24),
         Row(
           children: [
             _stat(
@@ -76,6 +88,19 @@ class HomePage extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 32),
+        if (recentlyPlayed.isNotEmpty) ...[
+          const SectionTitle('Recently played'),
+          VaultGrid(
+            games: recentlyPlayed.take(4).toList(),
+            onOpen: onOpen,
+            onFavorite: (g) => controller.update(
+              g.appId,
+              (current) => current.copy(favorite: !current.favorite),
+            ),
+            shrinkWrap: true,
+          ),
+          const SizedBox(height: 28),
+        ],
         if (playing.isNotEmpty) ...[
           const SectionTitle('In rotation'),
           VaultGrid(
@@ -193,6 +218,16 @@ class _LibraryPageState extends State<LibraryPage> {
     games.sort(
       (a, b) => sort == 'Title A–Z'
           ? a.title.toLowerCase().compareTo(b.title.toLowerCase())
+          : sort == 'Most played'
+          ? widget.controller
+                .played(b.appId)
+                .compareTo(widget.controller.played(a.appId))
+          : sort == 'Last played'
+          ? (widget.controller.tracker.lastPlayed(b.appId) ?? DateTime(1970))
+                .compareTo(
+                  widget.controller.tracker.lastPlayed(a.appId) ??
+                      DateTime(1970),
+                )
           : sort == 'Main story length'
           ? (a.hltb?.main ?? double.infinity).compareTo(
               b.hltb?.main ?? double.infinity,

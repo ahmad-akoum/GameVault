@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:path/path.dart' as p;
 import '../models/game.dart';
+import '../models/play_session.dart';
 
 class StorageFailure implements Exception {
   const StorageFailure(this.message);
@@ -9,10 +10,16 @@ class StorageFailure implements Exception {
 }
 
 class VaultSnapshot {
-  const VaultSnapshot(this.games, this.settings, {this.recovered = false});
+  const VaultSnapshot(
+    this.games,
+    this.settings, {
+    this.recovered = false,
+    this.sessions = const [],
+  });
   final List<VaultGame> games;
   final VaultSettings settings;
   final bool recovered;
+  final List<dynamic> sessions;
 }
 
 /// Small, versioned local document. Serialized writes, flushed staging file,
@@ -57,7 +64,7 @@ class LocalStore {
       try {
         final j =
             jsonDecode(await source.readAsString()) as Map<String, dynamic>;
-        if (j['version'] != 1) {
+        if (j['version'] != 1 && j['version'] != 2) {
           throw const FormatException('Unsupported storage version');
         }
         final games = (j['games'] as List).map((e) {
@@ -75,10 +82,18 @@ class LocalStore {
         if (games.map((g) => g.appId).toSet().length != games.length) {
           throw const FormatException('Duplicate IDs');
         }
+        final sessions = List<dynamic>.from(j['sessions'] ?? []);
+        for (final item in sessions) {
+          PlaySession.fromJson(Map<String, dynamic>.from(item));
+        }
+        if (sessions.map((s) => s['id']).toSet().length != sessions.length) {
+          throw const FormatException('Duplicate sessions');
+        }
         return VaultSnapshot(
           games,
           VaultSettings.fromJson(Map<String, dynamic>.from(j['settings'])),
           recovered: source.path == backup.path,
+          sessions: sessions,
         );
       } catch (e) {
         stderr.writeln('Storage read failed (${source.path}): $e');
@@ -92,9 +107,14 @@ class LocalStore {
     return const VaultSnapshot([], VaultSettings());
   }
 
-  Future<void> save(List<VaultGame> games, VaultSettings settings) {
+  Future<void> save(
+    List<VaultGame> games,
+    VaultSettings settings, {
+    List<Map<String, dynamic>> sessions = const [],
+  }) {
     final encoded = jsonEncode({
-      'version': 1,
+      'version': 2,
+      'sessions': sessions,
       'games': games.map((g) {
         final data = g.toJson();
         for (final key in ['coverPath', 'heroPath']) {
@@ -116,7 +136,7 @@ class LocalStore {
           // Only overwrite the backup when the current document is readable.
           try {
             final j = jsonDecode(await file.readAsString());
-            if (j is Map && j['version'] == 1) {
+            if (j is Map && (j['version'] == 1 || j['version'] == 2)) {
               final previousGames = (j['games'] as List)
                   .map((e) => VaultGame.fromJson(Map<String, dynamic>.from(e)))
                   .toList();
@@ -124,6 +144,18 @@ class LocalStore {
               if (previousGames.map((g) => g.appId).toSet().length !=
                   previousGames.length) {
                 throw const FormatException('Duplicate IDs');
+              }
+              for (final item in (j['sessions'] as List? ?? [])) {
+                PlaySession.fromJson(Map<String, dynamic>.from(item));
+              }
+              final previousSessions = j['sessions'] as List? ?? [];
+              if (previousSessions.map((s) => s['id']).toSet().length !=
+                  previousSessions.length) {
+                throw const FormatException('Duplicate sessions');
+              }
+              if (j['version'] == 1 &&
+                  !await File('${file.path}.v1-backup').exists()) {
+                await file.copy('${file.path}.v1-backup');
               }
               await file.copy(backup.path);
             }

@@ -91,7 +91,14 @@ class VaultGame {
     this.hltbUpdated,
     this.hltbMessage,
     this.metadataMessage,
+    this.executablePath,
+    this.collections = const [],
+    this.progressPercent,
   }) : addedAt = addedAt ?? DateTime.now();
+  final String? executablePath;
+  final List<String> collections;
+  final int? progressPercent;
+  bool get isManual => appId < 0;
   final int appId;
   final String title, installPath, libraryPath;
   final DateTime addedAt;
@@ -126,6 +133,11 @@ class VaultGame {
     DateTime? hltbUpdated,
     String? hltbMessage,
     String? metadataMessage,
+    String? executablePath,
+    List<String>? collections,
+    int? progressPercent,
+    bool clearProgress = false,
+    bool clearExecutable = false,
     bool clearMatch = false,
   }) => VaultGame(
     appId: appId,
@@ -147,6 +159,13 @@ class VaultGame {
     hltbUpdated: hltbUpdated ?? this.hltbUpdated,
     hltbMessage: hltbMessage ?? this.hltbMessage,
     metadataMessage: metadataMessage ?? this.metadataMessage,
+    executablePath: clearExecutable
+        ? null
+        : executablePath ?? this.executablePath,
+    collections: collections ?? this.collections,
+    progressPercent: clearProgress
+        ? null
+        : progressPercent ?? this.progressPercent,
   );
   Map<String, dynamic> toJson() => {
     'appId': appId,
@@ -170,6 +189,9 @@ class VaultGame {
     'hltbUpdated': hltbUpdated?.toIso8601String(),
     'hltbMessage': hltbMessage,
     'metadataMessage': metadataMessage,
+    'executablePath': executablePath,
+    'collections': collections,
+    'progressPercent': progressPercent,
   };
   factory VaultGame.fromJson(Map<String, dynamic> j) => VaultGame(
     appId: j['appId'] as int,
@@ -195,6 +217,9 @@ class VaultGame {
     hltbUpdated: DateTime.tryParse(j['hltbUpdated'] as String? ?? ''),
     hltbMessage: j['hltbMessage'] as String?,
     metadataMessage: j['metadataMessage'] as String?,
+    executablePath: j['executablePath'] as String?,
+    collections: List<String>.from(j['collections'] ?? []),
+    progressPercent: (j['progressPercent'] as int?)?.clamp(0, 100),
   );
 }
 
@@ -203,27 +228,54 @@ class VaultSettings {
     this.theme = AppearanceMode.dark,
     this.accent = 0xffb8d96e,
     this.paths = const [],
+    this.collections = const [],
+    this.idleThreshold = 60,
+    this.focusGrace = 10,
+    this.activityAdjusted = true,
+    this.trackingEnabled = true,
   });
   final AppearanceMode theme;
   final int accent;
-  final List<String> paths;
+  final List<String> paths, collections;
+  final int idleThreshold, focusGrace;
+  final bool activityAdjusted, trackingEnabled;
   VaultSettings copy({
     AppearanceMode? theme,
     int? accent,
     List<String>? paths,
+    List<String>? collections,
+    int? idleThreshold,
+    int? focusGrace,
+    bool? activityAdjusted,
+    bool? trackingEnabled,
   }) => VaultSettings(
     theme: theme ?? this.theme,
     accent: accent ?? this.accent,
     paths: paths ?? this.paths,
+    collections: collections ?? this.collections,
+    idleThreshold: idleThreshold ?? this.idleThreshold,
+    focusGrace: focusGrace ?? this.focusGrace,
+    activityAdjusted: activityAdjusted ?? this.activityAdjusted,
+    trackingEnabled: trackingEnabled ?? this.trackingEnabled,
   );
   Map<String, dynamic> toJson() => {
     'theme': theme.name,
     'accent': accent,
     'paths': paths,
+    'collections': collections,
+    'idleThreshold': idleThreshold,
+    'focusGrace': focusGrace,
+    'activityAdjusted': activityAdjusted,
+    'trackingEnabled': trackingEnabled,
   };
   factory VaultSettings.fromJson(Map<String, dynamic> j) => VaultSettings(
     theme: AppearanceMode.values.byName(j['theme'] as String? ?? 'dark'),
     accent: j['accent'] as int? ?? 0xffb8d96e,
     paths: List<String>.from(j['paths'] ?? []),
+    collections: List<String>.from(j['collections'] ?? []),
+    idleThreshold: ((j['idleThreshold'] as int?) ?? 60).clamp(15, 3600),
+    focusGrace: ((j['focusGrace'] as int?) ?? 10).clamp(0, 300),
+    activityAdjusted: j['activityAdjusted'] != false,
+    trackingEnabled: j['trackingEnabled'] != false,
   );
 }

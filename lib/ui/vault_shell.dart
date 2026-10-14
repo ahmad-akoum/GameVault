@@ -6,6 +6,8 @@ import 'library_pages.dart';
 import 'detected_page.dart';
 import 'details_page.dart';
 import 'settings_page.dart';
+import 'activity_pages.dart';
+import 'collections_page.dart';
 
 class VaultShell extends StatefulWidget {
   const VaultShell({super.key, required this.controller});
@@ -100,6 +102,8 @@ class _VaultShellState extends State<VaultShell> {
               onScan: _scan,
               favorites: true,
             ),
+            5 => StatisticsPage(controller: c, onOpen: _open),
+            6 => CollectionsPage(controller: c, onOpen: _open),
             3 => SettingsPage(controller: c, onScan: _scan),
             _ => DetectedPage(
               controller: c,
@@ -114,7 +118,7 @@ class _VaultShellState extends State<VaultShell> {
             width: compact ? 78 : 214,
             decoration: BoxDecoration(
               color: scheme.brightness == Brightness.dark
-                  ? const Color(0xff121417)
+                  ? const Color(0xff0d111a)
                   : const Color(0xffeaece7),
               border: Border(right: BorderSide(color: scheme.outlineVariant)),
             ),
@@ -124,9 +128,9 @@ class _VaultShellState extends State<VaultShell> {
                 Padding(
                   padding: EdgeInsets.fromLTRB(
                     compact ? 19 : 24,
-                    30,
+                    20,
                     compact ? 19 : 20,
-                    35,
+                    24,
                   ),
                   child: Row(
                     children: [
@@ -158,6 +162,8 @@ class _VaultShellState extends State<VaultShell> {
                 _nav(0, Icons.home_outlined, 'Home', compact),
                 _nav(1, Icons.grid_view_outlined, 'My Library', compact),
                 _nav(2, Icons.favorite_border, 'Favorites', compact),
+                _nav(6, Icons.folder_outlined, 'Collections', compact),
+                _nav(5, Icons.bar_chart_rounded, 'Activity', compact),
                 const SizedBox(height: 24),
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: compact ? 14 : 22),
@@ -165,6 +171,7 @@ class _VaultShellState extends State<VaultShell> {
                 ),
                 const SizedBox(height: 16),
                 _nav(4, Icons.manage_search, 'Find games', compact),
+                _nav(7, Icons.add_box_outlined, 'Add local game', compact),
                 const Spacer(),
                 _nav(3, Icons.tune, 'Settings', compact),
                 Padding(
@@ -175,7 +182,7 @@ class _VaultShellState extends State<VaultShell> {
                     22,
                   ),
                   child: Text(
-                    compact ? 'V1' : 'PERSONAL LIBRARY  /  V1',
+                    compact ? 'V2' : 'LOCAL LIBRARY  /  V2',
                     textAlign: compact ? TextAlign.center : TextAlign.start,
                     style: TextStyle(
                       fontSize: 10,
@@ -190,6 +197,13 @@ class _VaultShellState extends State<VaultShell> {
           Expanded(
             child: Column(
               children: [
+                if (c.trackingError != null)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    color: scheme.secondaryContainer,
+                    child: Text(c.trackingError!),
+                  ),
                 if (c.error != null)
                   Container(
                     color: scheme.errorContainer,
@@ -276,11 +290,13 @@ class _VaultShellState extends State<VaultShell> {
           color: selected
               ? scheme.primary.withValues(alpha: 0.10)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(5),
+          borderRadius: BorderRadius.circular(10),
           child: InkWell(
-            borderRadius: BorderRadius.circular(5),
+            borderRadius: BorderRadius.circular(10),
             onTap: () {
-              if (value == 4 && widget.controller.detected.isEmpty) {
+              if (value == 7) {
+                importExecutable(context, widget.controller);
+              } else if (value == 4 && widget.controller.detected.isEmpty) {
                 _scan();
               } else {
                 _navigate(value);

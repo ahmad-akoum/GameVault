@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:path/path.dart' as p;
 import '../models/game.dart';
 import '../services/local_store.dart';
 import '../services/steam_scanner.dart';
 import '../services/hltb_provider.dart';
 import '../services/metadata_provider.dart';
+import '../services/windows_games.dart';
+import '../services/session_tracker.dart';
 
 class VaultController extends ChangeNotifier {
   VaultController({
@@ -13,11 +16,23 @@ class VaultController extends ChangeNotifier {
     required this.scanner,
     required this.metadata,
     required this.hltb,
+    this.platform,
   });
   final LocalStore store;
   final SteamScanner scanner;
   final GameMetadataProvider metadata;
   final HltbProvider hltb;
+  final GamePlatform? platform;
+  final SessionTracker tracker = SessionTracker();
+  final Stopwatch _clock = Stopwatch();
+  Timer? _monitor;
+  Future<void>? _poll;
+  bool _closing = false;
+  int _lastCheckpoint = 0;
+  String? trackingError;
+  final Map<int, int> pendingLaunches = {};
+  int played(int id) => tracker.total(id, active: settings.activityAdjusted);
+  bool running(int id) => tracker.current(id) != null;
   List<VaultGame> games = [];
   VaultSettings settings = const VaultSettings();
   List<SteamGame> detected = [];
@@ -36,6 +51,7 @@ class VaultController extends ChangeNotifier {
       final snapshot = await store.load();
       games = snapshot.games;
       settings = snapshot.settings;
+      tracker.load(snapshot.sessions);
       if (snapshot.recovered) {
         error = 'Your library was recovered from its previous saved version.';
       }
@@ -49,6 +65,10 @@ class VaultController extends ChangeNotifier {
       storageBlocked = true;
     }
     initialized = true;
+    if (!storageBlocked && platform != null) {
+      _clock.start();
+      _monitor = Timer.periodic(const Duration(seconds: 2), (_) => pollGames());
+    }
     notifyListeners();
   }
 
@@ -57,7 +77,7 @@ class VaultController extends ChangeNotifier {
       return false;
     }
     try {
-      await store.save(next, nextSettings);
+      await store.save(next, nextSettings, sessions: tracker.toJson());
       games = next;
       settings = nextSettings;
       notifyListeners();
@@ -198,6 +218,156 @@ class VaultController extends ChangeNotifier {
     }
   }
 
+  Future<void> launch(int id) async {
+    final g = game(id);
+    if (g == null || running(id) || pendingLaunches.containsKey(id)) return;
+    if (platform == null) {
+      error = 'Game launching is available on Windows.';
+      notifyListeners();
+      return;
+    }
+    pendingLaunches[id] = _clock.elapsed.inSeconds + 120;
+    notifyListeners();
+    try {
+      await platform!.launch(g);
+      if (!settings.trackingEnabled) {
+        pendingLaunches.remove(id);
+        notifyListeners();
+        return;
+      }
+      await pollGames();
+    } catch (_) {
+      pendingLaunches.remove(id);
+      error =
+          'Could not launch ${g.title}. Check its installation, executable and Steam availability.';
+      notifyListeners();
+    }
+  }
+
+  Future<void> pollGames() {
+    if (_closing || storageBlocked || platform == null) return Future.value();
+    return _poll ??= _sampleGames().whenComplete(() => _poll = null);
+  }
+
+  Future<void> _sampleGames() async {
+    try {
+      final sample = settings.trackingEnabled
+          ? await platform!.sample(List.of(games))
+          : WindowsSample([], 0);
+      await _mutate(() async {
+        if (_closing) return;
+        final before = tracker.sessions.length;
+        final openBefore = tracker.sessions.where((s) => s.open).length;
+        tracker.sample(
+          now: DateTime.now(),
+          monotonicSeconds: _clock.elapsed.inSeconds,
+          games: sample.games.where((g) => game(g.id) != null).toList(),
+          idleSeconds: sample.idleSeconds,
+          idleThreshold: settings.idleThreshold,
+          focusGrace: settings.focusGrace,
+        );
+        trackingError = null;
+        for (final id in pendingLaunches.keys.toList()) {
+          if (running(id)) {
+            pendingLaunches.remove(id);
+          } else if (_clock.elapsed.inSeconds >= pendingLaunches[id]!) {
+            pendingLaunches.remove(id);
+            error =
+                'No game process was confirmed. If it is running, choose its exact tracking executable on the detail page.';
+          }
+        }
+        final elapsed = _clock.elapsed.inSeconds;
+        if (before != tracker.sessions.length ||
+            openBefore != tracker.sessions.where((s) => s.open).length ||
+            (tracker.sessions.any((s) => s.open) &&
+                elapsed - _lastCheckpoint >= 15)) {
+          if (await _commit(games, settings)) _lastCheckpoint = elapsed;
+        }
+        notifyListeners();
+      });
+    } catch (_) {
+      tracker.closeAll('Monitoring unavailable');
+      trackingError =
+          'Game monitoring is unavailable. Unobserved time is not counted.';
+      notifyListeners();
+    }
+  }
+
+  Future<void> addManual(String title, String executable) => _mutate(() async {
+    final path = p.normalize(executable);
+    if (title.trim().isEmpty ||
+        !p.isAbsolute(path) ||
+        !path.toLowerCase().endsWith('.exe') ||
+        !await File(path).exists()) {
+      error = 'Choose an existing .exe file and enter a game name.';
+      notifyListeners();
+      return;
+    }
+    if (games.any(
+      (g) => g.executablePath?.toLowerCase() == path.toLowerCase(),
+    )) {
+      error = 'This executable is already in your library.';
+      notifyListeners();
+      return;
+    }
+    // Removed games may still have history. Never reuse their identity.
+    final lowest = [
+      ...games.map((g) => g.appId),
+      ...tracker.sessions.map((s) => s.gameId),
+    ].fold<int>(0, (id, candidate) => candidate < id ? candidate : id);
+    await _commit([
+      ...games,
+      VaultGame(
+        appId: lowest - 1,
+        title: title.trim(),
+        installPath: p.dirname(path),
+        libraryPath: p.dirname(path),
+        executablePath: path,
+      ),
+    ], settings);
+  });
+
+  Future<void> saveCollection(String name, {String? previous}) => _mutate(
+    () async {
+      final clean = name.trim();
+      if (clean.isEmpty ||
+          clean.length > 60 ||
+          settings.collections.any(
+            (c) => c != previous && c.toLowerCase() == clean.toLowerCase(),
+          )) {
+        error = 'Use a unique collection name between 1 and 60 characters.';
+        notifyListeners();
+        return;
+      }
+      final names = [...settings.collections.where((n) => n != previous), clean]
+        ..sort();
+      final next = games
+          .map(
+            (g) => g.copy(
+              collections: g.collections
+                  .map((n) => n == previous ? clean : n)
+                  .toList(),
+            ),
+          )
+          .toList();
+      await _commit(next, settings.copy(collections: names));
+    },
+  );
+  Future<void> deleteCollection(String name) => _mutate(() async {
+    await _commit(
+      games
+          .map(
+            (g) => g.copy(
+              collections: g.collections.where((n) => n != name).toList(),
+            ),
+          )
+          .toList(),
+      settings.copy(
+        collections: settings.collections.where((n) => n != name).toList(),
+      ),
+    );
+  });
+
   Future<void> lookup(int id, {String? query}) {
     final result = _lookupTail.then((_) => _lookup(id, query));
     _lookupTail = result.catchError((Object e) {
@@ -272,6 +442,14 @@ class VaultController extends ChangeNotifier {
   }
 
   Future<void> shutdown() async {
+    _closing = true;
+    _monitor?.cancel();
+    await _poll;
+    await _mutate(() async {
+      final hasOpen = tracker.sessions.any((s) => s.open);
+      tracker.closeAll('GameVault closed');
+      if (hasOpen) await _commit(games, settings);
+    });
     storageBlocked = true;
     await _mutationTail;
     await store.close();
