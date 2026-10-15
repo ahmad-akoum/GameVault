@@ -256,6 +256,8 @@ class VaultController extends ChangeNotifier {
           : WindowsSample([], 0);
       await _mutate(() async {
         if (_closing) return;
+        final hadError = trackingError != null;
+        final pendingBefore = pendingLaunches.length;
         final before = tracker.sessions.length;
         final openBefore = tracker.sessions.where((s) => s.open).length;
         tracker.sample(
@@ -283,7 +285,13 @@ class VaultController extends ChangeNotifier {
                 elapsed - _lastCheckpoint >= 15)) {
           if (await _commit(games, settings)) _lastCheckpoint = elapsed;
         }
-        notifyListeners();
+        if (hadError ||
+            pendingBefore != pendingLaunches.length ||
+            before != tracker.sessions.length ||
+            openBefore > 0 ||
+            tracker.sessions.any((s) => s.open)) {
+          notifyListeners();
+        }
       });
     } catch (_) {
       tracker.closeAll('Monitoring unavailable');

@@ -58,36 +58,32 @@ class GameArtwork extends StatelessWidget {
         );
       },
     );
-    if (path != null && File(path!).existsSync()) {
-      return Image.file(
-        File(path!),
-        fit: fit,
-        errorBuilder: (_, error, stack) => fallback(),
-      );
-    }
-    if (url != null) {
-      return Image.network(
-        url!,
-        fit: fit,
-        errorBuilder: (_, error, stack) => fallback(),
-        loadingBuilder: (_, child, progress) => progress == null
-            ? child
-            : ColoredBox(
-                color: scheme.surfaceContainer,
-                child: Center(
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ),
-      );
-    }
-    return fallback();
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final decodeWidth = width.isFinite && width > 0
+            ? (width * MediaQuery.devicePixelRatioOf(context)).ceil().clamp(
+                1,
+                4096,
+              )
+            : null;
+        Widget remote() => url == null
+            ? fallback()
+            : Image.network(
+                url!,
+                fit: fit,
+                cacheWidth: decodeWidth,
+                errorBuilder: (_, error, stack) => fallback(),
+              );
+        if (path == null) return remote();
+        return Image.file(
+          File(path!),
+          fit: fit,
+          cacheWidth: decodeWidth,
+          errorBuilder: (_, error, stack) => remote(),
+        );
+      },
+    );
   }
 }
 

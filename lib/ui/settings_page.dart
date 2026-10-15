@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import '../models/game.dart';
 import '../state/vault_controller.dart';
 import 'components.dart';
+import 'app_version.dart';
 import 'tracking_controls.dart';
 
 class SettingsPage extends StatelessWidget {
@@ -214,7 +215,7 @@ class SettingsPage extends StatelessWidget {
         const SizedBox(height: 30),
         const Divider(),
         const SizedBox(height: 22),
-        Text('GameVault 1.0.0', style: Theme.of(context).textTheme.titleMedium),
+        const AppVersionLabel(),
         const SizedBox(height: 6),
         Text(
           'A personal Windows game library. Steam and HowLongToBeat are independent services.',

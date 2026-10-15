@@ -86,3 +86,5 @@ docs/screenshots/private/
 *.dll
 *.pdb
 *.obj
+
+/release_artifacts/

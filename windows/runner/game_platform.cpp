@@ -1,4 +1,5 @@
 #include "game_platform.h"
+#include "dualsense_activity.h"
 #include <windows.h>
 #include <shellapi.h>
 #include <tlhelp32.h>
@@ -110,7 +111,7 @@ L Snapshot(const L& games) {
   }
   return result;
 }
-int IdleSeconds() {
+int IdleSeconds(ULONGLONG dualsense) {
   LASTINPUTINFO input{}; input.cbSize = sizeof(input);
   if (!GetLastInputInfo(&input)) throw std::runtime_error("Idle observation unavailable");
   DWORD idle = GetTickCount() - input.dwTime;
@@ -124,21 +125,26 @@ int IdleSeconds() {
           abs(g.sThumbRX) > XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE || abs(g.sThumbRY) > XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE) lastController = GetTickCount64();
     }
   }
+  lastController = std::max(lastController, dualsense);
   if (lastController != 0) idle = static_cast<DWORD>(std::min<ULONGLONG>(idle,GetTickCount64()-lastController));
   return static_cast<int>(idle / 1000);
 }
 }
 
-GamePlatform::GamePlatform(flutter::BinaryMessenger* messenger) {
+GamePlatform::GamePlatform(flutter::BinaryMessenger* messenger, HWND window) : window_(window) {
+  RAWINPUTDEVICE device{0x01, 0x05, RIDEV_INPUTSINK | RIDEV_DEVNOTIFY, window_};
+  registered_ = RegisterRawInputDevices(&device, 1, sizeof(device)) != FALSE;
   channel_ = std::make_unique<flutter::MethodChannel<V>>(messenger,"gamevault/windows",&flutter::StandardMethodCodec::GetInstance());
-  channel_->SetMethodCallHandler([](const flutter::MethodCall<V>& call, std::unique_ptr<flutter::MethodResult<V>> result) {
+  channel_->SetMethodCallHandler([this](const flutter::MethodCall<V>& call, std::unique_ptr<flutter::MethodResult<V>> result) {
     const auto* args = call.arguments() ? std::get_if<M>(call.arguments()) : nullptr;
     if (!args) { result->Error("invalid_arguments","Expected game parameters"); return; }
     try {
-      if (call.method_name() == "sample") {
+      if (call.method_name() == "appVersion") {
+        result->Success(V(FLUTTER_VERSION));
+      } else if (call.method_name() == "sample") {
         const auto* value = Field(*args,"games"); const auto* games = value ? std::get_if<L>(value) : nullptr;
         if (!games) { result->Error("invalid_arguments","Missing game list"); return; }
-        result->Success(V(M{{V("games"),V(Snapshot(*games))},{V("idleSeconds"),V(IdleSeconds())}}));
+        result->Success(V(M{{V("games"),V(Snapshot(*games))},{V("idleSeconds"),V(IdleSeconds(last_dualsense_))}}));
       } else if (call.method_name() == "launch" || call.method_name() == "openWeb") {
         std::wstring target, directory;
         if (call.method_name() == "openWeb") {
@@ -160,4 +166,44 @@ GamePlatform::GamePlatform(flutter::BinaryMessenger* messenger) {
       } else result->NotImplemented();
     } catch (const std::exception& e) { result->Error("platform_error",e.what()); }
   });
+}
+
+GamePlatform::~GamePlatform() {
+  if (registered_) {
+    RAWINPUTDEVICE device{0x01, 0x05, RIDEV_REMOVE, nullptr};
+    RegisterRawInputDevices(&device, 1, sizeof(device));
+  }
+}
+
+void GamePlatform::HandleInput(UINT message, LPARAM data) {
+  if (message == WM_INPUT_DEVICE_CHANGE) {
+    devices_.erase(reinterpret_cast<HANDLE>(data));
+    return;
+  }
+  if (message != WM_INPUT || !registered_) return;
+  UINT size = 0;
+  auto handle = reinterpret_cast<HRAWINPUT>(data);
+  if (GetRawInputData(handle, RID_INPUT, nullptr, &size, sizeof(RAWINPUTHEADER)) != 0 ||
+      size < sizeof(RAWINPUTHEADER) || size > 65536) return;
+  std::vector<BYTE> bytes(size);
+  if (GetRawInputData(handle, RID_INPUT, bytes.data(), &size, sizeof(RAWINPUTHEADER)) != size) return;
+  const auto* input = reinterpret_cast<const RAWINPUT*>(bytes.data());
+  if (input->header.dwType != RIM_TYPEHID || size < offsetof(RAWINPUT, data.hid.bRawData)) return;
+  auto found = devices_.find(input->header.hDevice);
+  if (found == devices_.end()) {
+    RID_DEVICE_INFO info{}; info.cbSize = sizeof(info); UINT length = sizeof(info);
+    bool supported = GetRawInputDeviceInfo(input->header.hDevice, RIDI_DEVICEINFO, &info, &length) != UINT(-1) &&
+        info.dwType == RIM_TYPEHID && info.hid.dwVendorId == 0x054c && info.hid.dwProductId == 0x0ce6;
+    found = devices_.emplace(input->header.hDevice, supported).first;
+  }
+  if (!found->second) return;
+  const auto& hid = input->data.hid;
+  const size_t available = size - offsetof(RAWINPUT, data.hid.bRawData);
+  if (!hid.dwSizeHid || hid.dwCount > available / hid.dwSizeHid) return;
+  for (DWORD i = 0; i < hid.dwCount; ++i) {
+    if (DualSenseActive(hid.bRawData + static_cast<size_t>(i) * hid.dwSizeHid, hid.dwSizeHid)) {
+      last_dualsense_ = GetTickCount64();
+      break; // Only a timestamp is retained; no button histories or input logging.
+    }
+  }
 }

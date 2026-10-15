@@ -3,8 +3,8 @@
 A local-first Windows game library built with Flutter. Discover installed Steam
 games, choose what to import, launch games and track new play sessions in one place.
 
-**Current status: `v2.0.0-rc.1` — release candidate awaiting owner acceptance testing.**
-No stable V2 release or public distribution is claimed. V2.1 research is not implemented.
+**V2.0.0 stabilization is prepared locally; publication awaits owner approval.**
+V2.1 visual customization and V3 ratings are separate future milestones in this snapshot.
 
 ## Supported platforms
 
@@ -23,7 +23,7 @@ establish Android support for GameVault.
 - Observed runtime and activity-adjusted playtime, including imported games launched
   elsewhere while GameVault remains open.
 - Configurable idle/focus thresholds: 60 seconds without input and 10 seconds unfocused.
-  Keyboard/mouse activity and XInput controller activity are considered.
+  Keyboard/mouse and existing XInput activity are retained; standard DualSense Raw Input supplements them. Physical Bluetooth testing remains pending.
 - Home activity summaries, recent games, statistics and session history.
 - Dark/light/system appearance, accent customization and responsive desktop layouts.
 - V1 data migration, previous-good backups, interrupted-session recovery, serialized
@@ -91,7 +91,7 @@ are required for the currently implemented local features.
 - Tracking requires GameVault to remain open. Sampling is about every two seconds;
   session checkpoints are about every 15 seconds. Crashes can lose the last unsaved interval.
 - Global input is an activity estimate. Reading and cutscenes may be classified idle;
-  non-XInput controller APIs are not integrated.
+  standard DualSense Raw Input is included, with physical acceptance testing pending.
 - Protected processes and unusual launchers may require selecting the real executable.
   Ambiguous process matches are ignored; a process is not credited to multiple games.
 - Steam metadata and HLTB are best-effort integrations that can change or become unavailable.
@@ -121,3 +121,7 @@ publication checks and remaining manual tests.
 No open-source license is granted by this repository. Dependencies retain their
 respective licenses. GameVault is not affiliated with Valve, Steam, HowLongToBeat,
 Metacritic, RAWG or IGDB. External services and their data remain subject to their terms.
+
+## Stabilization
+
+Settings uses actual Windows build metadata. Idle polls avoid redundant rebuilds; artwork decoding is bounded and file existence checks no longer block widget builds. No measured high-refresh FPS claim. See [V2.0 release notes](docs/releases/v2.0.0.md). HLTB website access is not cleared for public distribution; see [licensing](docs/LICENSING.md).

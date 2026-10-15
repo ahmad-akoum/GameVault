@@ -21,3 +21,5 @@ helper is also omitted. Synthetic test fixtures remain; they contain no user vau
 README, ignore rules and publication documents are new preparation work.
 
 No historical public release or personal V2 acceptance test is claimed.
+
+Stabilized V2.0 source exported from original local commit `b18692fc1c8f6ef68d969809b7d7dd8fbb8ec715`. Private history was not imported. Runtime source is unchanged by export.
