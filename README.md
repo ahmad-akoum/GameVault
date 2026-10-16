@@ -1,129 +1,72 @@
 # GameVault
 
-A local-first Windows game library built with Flutter. Discover installed Steam
-games, choose what to import, launch games and track new play sessions in one place.
+A local-first Flutter Windows game library: discover installed games, choose what to import, launch them, and track new play sessions.
 
-**V2.0.0 stabilization is prepared locally; publication awaits owner approval.**
-V2.1 visual customization and V3 ratings are separate future milestones in this snapshot.
+**V2.1.0 - Visual Customization Update is prepared locally for owner acceptance testing. Nothing has been published by this release-preparation work.** V2.0 remains available as a separate stabilized source snapshot and portable package.
 
-## Supported platforms
-
-Windows desktop is the implemented target. Android, macOS, Linux and web are not
-supported application releases. An unrelated Android toolchain smoke build does not
-establish Android support for GameVault.
+## Supported platform
+Windows x64 desktop. Flutter 3.38.5, Dart 3.10.4 and Visual Studio 2022 with Desktop development with C++ were used for validation. Android is not a supported GameVault release; prior Android build success does not establish working desktop integrations on a phone.
 
 ## Implemented features
+- Steam discovery across libraries and drives, manifest validation and non-game filtering, including Wallpaper Engine. Detection never automatically imports games.
+- Cached artwork, metadata, best-effort HowLongToBeat estimates and manual matching.
+- Search, sorting, favorites, statuses, named collections and manual completion progress.
+- Steam/local executable launching and conservative process matching.
+- Total observed session time and activity-adjusted time; configurable 60-second idle and 10-second focus-loss defaults, session history and dashboard statistics.
+- Keyboard/mouse and existing XInput activity; standard DualSense Raw Input observation with drift/noise thresholds. Real Bluetooth acceptance tests remain pending.
+- Dark, Light and System appearance; Cobalt, Crimson, Emerald, Amethyst, Obsidian and Midnight presets; separate accent/background/surface custom colors with preview. Surface hues adapt to mode for readable contrast.
+- Compact, Comfortable and Expanded game profiles with a persistent size preference.
+- Enlarged artwork viewer with zoom, pan, reset, Escape and a close button.
+- Local persistence, previous-good backup, V1 migration backup, interrupted-session recovery and a data-folder writer lock.
 
-- Steam discovery across configured libraries, manifest validation and filtering of
-  recognized tools, redistributables and Wallpaper Engine. Playable demos can appear.
-- Selective import: detecting a game never automatically adds it to My Library.
-- Steam metadata, cached artwork and best-effort HowLongToBeat matching.
-- Search, filters, sorting, favorites, statuses, collections and manual progress.
-- Steam launching and import/launch of local Windows executables.
-- Observed runtime and activity-adjusted playtime, including imported games launched
-  elsewhere while GameVault remains open.
-- Configurable idle/focus thresholds: 60 seconds without input and 10 seconds unfocused.
-  Keyboard/mouse and existing XInput activity are retained; standard DualSense Raw Input supplements them. Physical Bluetooth testing remains pending.
-- Home activity summaries, recent games, statistics and session history.
-- Dark/light/system appearance, accent customization and responsive desktop layouts.
-- V1 data migration, previous-good backups, interrupted-session recovery, serialized
-  saves and a data-folder lock against concurrent writers.
+## Install or upgrade
+Extract the entire versioned Windows ZIP to a writable folder. Keep gamevault.exe, all DLLs and the data directory together; run gamevault.exe after extraction. Microsoft Visual C++ runtime may be required on another PC.
 
-## Requirements and setup
+Close GameVault and back up its entire vault_data folder before upgrading. Keep each historical vault separately. A new extracted release starts empty unless you explicitly provide a copy of your current vault. Never merge or replace a newer vault with an older one. See [user guide](docs/USER_GUIDE.md).
 
-Development was previously validated with Flutter **3.38.5**, Dart **3.10.4**, and
-Visual Studio 2022 on Windows. Install Flutter with Dart on PATH and Visual Studio's
-**Desktop development with C++** workload, including the Windows SDK.
-
-After repository access is granted:
+## Develop
+Install the Windows Flutter toolchain and run:
 
 ```powershell
-git clone https://github.com/ahmad-akoum/GameVault.git
-cd GameVault
-flutter doctor -v
 flutter pub get
 .\scripts\prepare_windows.ps1
 flutter analyze --no-pub
 flutter test --no-pub
-```
-
-`prepare_windows.ps1` creates project-local plugin junctions when Windows symlink
-privileges are unavailable. It does not change Windows security or the Flutter SDK.
-If the first `flutter pub get` reports missing symlink support after resolving
-dependencies, run the preparation script and then repeat `flutter pub get`.
-
-Use an isolated data folder for development and acceptance testing:
-
-```powershell
 $env:GAMEVAULT_DATA_DIR = Join-Path (Get-Location) 'build\dev-vault'
 flutter run -d windows
 ```
 
-Build the regular Windows application:
+The preparation script creates local plugin junctions where symlink privileges are unavailable. If dependency resolution reports missing symlink support, run the script then repeat pub get. Do not upgrade dependencies just to build this release.
 
 ```powershell
-flutter build windows --release --no-pub -t lib/main.dart
+.\scripts\build_private_release.ps1 -Version 2.1.0
+python tool/package_release.py 2.1.0
 ```
 
-The output is `build/windows/x64/runner/Release/`. Keep the executable, DLLs and
-Flutter `data` directory together. A standalone EXE is not the complete application.
-Other PCs may require Microsoft's Visual C++ runtime. Do not include `vault_data`
-in an archive intended for other people.
+Output: build/windows/x64/runner/Release. Packaging selects runtime files only and refuses to overwrite an existing versioned ZIP. Verify pubspec version and the executable's ProductVersion before packaging. See [developer guide](docs/DEVELOPMENT.md).
 
-## Storage and privacy
+## Privacy and limitations
+Data is stored in vault_data beside the executable, or the directory selected by GAMEVAULT_DATA_DIR. The application keeps no keystroke or controller-button history. Metadata services receive requests; local tracking is not an authenticated Steam account integration.
 
-By default, GameVault keeps `vault_data` beside its executable. `GAMEVAULT_DATA_DIR`
-overrides that location. Close the app before backing up the entire data folder.
-Keep your real vault separate from development, tests and release packaging.
+Historical Steam hours and historical AFK time cannot be reconstructed. Monitoring needs GameVault to remain open. Two-second process sampling and 15-second checkpoints are approximate; recent unsaved time may be lost after a crash. Global activity is an estimate, so reading or cutscenes can be classified inactive. Protected processes and unusual launchers may need an explicit executable selection.
 
-The first V2 save preserves a readable V1 document as `vault.json.v1-backup`.
-Recoverable corruption can fall back to a valid backup; unrecoverable data blocks
-startup rather than silently resetting the library.
+Physical DualSense Bluetooth tests with Steam Input on/off, Windows high-refresh frame measurements and clean-machine installation remain manual checks. The scrolling changes do not establish a measured 120/180 FPS result.
 
-Metadata/artwork and HLTB lookups contact external services. Local session tracking
-does not record keystroke contents or inject code into games. No provider credentials
-are required for the currently implemented local features.
-
-## Limitations
-
-- Historical Steam hours, past AFK reconstruction, achievements and critic/community
-  rating integrations are not implemented.
-- Tracking requires GameVault to remain open. Sampling is about every two seconds;
-  session checkpoints are about every 15 seconds. Crashes can lose the last unsaved interval.
-- Global input is an activity estimate. Reading and cutscenes may be classified idle;
-  standard DualSense Raw Input is included, with physical acceptance testing pending.
-- Protected processes and unusual launchers may require selecting the real executable.
-  Ambiguous process matches are ignored; a process is not credited to multiple games.
-- Steam metadata and HLTB are best-effort integrations that can change or become unavailable.
-- Personal progress is manually entered, not calculated from achievements or HLTB.
+**HowLongToBeat public-distribution permission is unresolved.** Its existing undocumented website adapter is unchanged and can stop working. No Explorer is included; written authorization or a permitted provider is needed before clearing public distribution. Ratings are reserved for V3.
 
 ## Screenshots
+Screenshots of personal libraries are intentionally excluded. No private artwork cache or game/session database is distributed.
 
-Public-safe screenshots are pending. Existing local screenshots contain a personal
-game library and are deliberately excluded. Future images should use a separate
-demonstration vault and accurately show the release candidate without invented metrics.
-
-## Validation and releases
-
-The retained V2 development report records 53 automated tests passing, clean analysis,
-a successful Windows build and a native fixture smoke test. These historical checks
-are not owner acceptance testing. See [validation](docs/VALIDATION.md) for current
-publication checks and remaining manual tests.
-
+## Release documentation
 - [Changelog](CHANGELOG.md)
-- [Release candidate notes](docs/releases/v2.0.0-rc.1.md)
-- [Source provenance](docs/SOURCE_PROVENANCE.md)
-- [Development and release workflow](CONTRIBUTING.md)
+- [V2.0 notes](docs/releases/v2.0.0.md)
+- [V2.1 notes](docs/releases/v2.1.0.md)
+- [Validation](docs/VALIDATION_2026-10.md)
 - [Roadmap](docs/ROADMAP.md)
+- [License and services](docs/LICENSING.md)
 
-## Ownership and third-party services
+No open-source license is granted for original GameVault code at this time. Dependencies retain their own licenses. GameVault is independent of Valve, Sony, Microsoft and HowLongToBeat.
 
-No open-source license is granted by this repository. Dependencies retain their
-respective licenses. GameVault is not affiliated with Valve, Steam, HowLongToBeat,
-Metacritic, RAWG or IGDB. External services and their data remain subject to their terms.
+Release packages are prepared under release_artifacts/ready/<version>. Private debug symbols remain under release_artifacts/private-symbols and must not be uploaded. A package privacy guard rejects local project/home paths embedded in runtime files. Use separate debug-symbol directories for each version.
 
-## Stabilization
-
-Settings uses actual Windows build metadata. Idle polls avoid redundant rebuilds; artwork decoding is bounded and file existence checks no longer block widget builds. No measured high-refresh FPS claim. See [V2.0 release notes](docs/releases/v2.0.0.md). HLTB website access is not cleared for public distribution; see [licensing](docs/LICENSING.md).
-
-V2.0 final stabilization also fixes normal Windows close: the runner explicitly destroys the window/engine before COM teardown. The prior unpublished preparation is retained as a checkpoint; no published tag or release is replaced.
+The private-release helper temporarily gives Flutter's generated plugin registrant a neutral package URI in generated package_config.json, compiles the same source, then restores that configuration byte-for-byte in a finally block. No dependency, SDK edit or source relocation is introduced. Debug splitting alone does not remove that URI. Do not run concurrent builds while the helper is running.

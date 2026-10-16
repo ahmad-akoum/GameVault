@@ -223,10 +223,19 @@ class VaultGame {
   );
 }
 
+enum ProfileSize { compact, comfortable, expanded }
+
+int? _color(dynamic value) => value is int && value >= 0 && value <= 0xffffffff
+    ? value | 0xff000000
+    : null;
+
 class VaultSettings {
   const VaultSettings({
     this.theme = AppearanceMode.dark,
     this.accent = 0xffb8d96e,
+    this.background,
+    this.surface,
+    this.profileSize = ProfileSize.comfortable,
     this.paths = const [],
     this.collections = const [],
     this.idleThreshold = 60,
@@ -236,12 +245,18 @@ class VaultSettings {
   });
   final AppearanceMode theme;
   final int accent;
+  final int? background, surface;
+  final ProfileSize profileSize;
   final List<String> paths, collections;
   final int idleThreshold, focusGrace;
   final bool activityAdjusted, trackingEnabled;
   VaultSettings copy({
     AppearanceMode? theme,
     int? accent,
+    int? background,
+    int? surface,
+    bool resetColors = false,
+    ProfileSize? profileSize,
     List<String>? paths,
     List<String>? collections,
     int? idleThreshold,
@@ -251,6 +266,9 @@ class VaultSettings {
   }) => VaultSettings(
     theme: theme ?? this.theme,
     accent: accent ?? this.accent,
+    background: resetColors ? null : background ?? this.background,
+    surface: resetColors ? null : surface ?? this.surface,
+    profileSize: profileSize ?? this.profileSize,
     paths: paths ?? this.paths,
     collections: collections ?? this.collections,
     idleThreshold: idleThreshold ?? this.idleThreshold,
@@ -261,6 +279,9 @@ class VaultSettings {
   Map<String, dynamic> toJson() => {
     'theme': theme.name,
     'accent': accent,
+    if (background != null) 'background': background,
+    if (surface != null) 'surface': surface,
+    'profileSize': profileSize.name,
     'paths': paths,
     'collections': collections,
     'idleThreshold': idleThreshold,
@@ -271,6 +292,13 @@ class VaultSettings {
   factory VaultSettings.fromJson(Map<String, dynamic> j) => VaultSettings(
     theme: AppearanceMode.values.byName(j['theme'] as String? ?? 'dark'),
     accent: j['accent'] as int? ?? 0xffb8d96e,
+    background: _color(j['background']),
+    surface: _color(j['surface']),
+    profileSize:
+        ProfileSize.values
+            .where((v) => v.name == j['profileSize'])
+            .firstOrNull ??
+        ProfileSize.comfortable,
     paths: List<String>.from(j['paths'] ?? []),
     collections: List<String>.from(j['collections'] ?? []),
     idleThreshold: ((j['idleThreshold'] as int?) ?? 60).clamp(15, 3600),

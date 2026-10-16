@@ -25,3 +25,7 @@ No historical public release or personal V2 acceptance test is claimed.
 Stabilized V2.0 source exported from original local commit `b18692fc1c8f6ef68d969809b7d7dd8fbb8ec715`. Private history was not imported. Runtime source is unchanged by export.
 
 Final V2.0 source: `32583123ec2b0e9dc1206d56a62ac64a76c87820`, including the shutdown fix found during portable runtime testing.
+
+V2.1 source exported from original commit `0d03964e1fa56f1076ed1e1f1ee682e35ba4d41c`. Application source and locked dependency versions match; only public documentation/ignore rules differ. Both final versions include the separate shutdown fix.
+
+Final local V2.1 documentation/tag checkpoint: `f0b3356d7026b55448a768c7703a576c6437bda7`. Runtime source is identical to the implementation checkpoint above.

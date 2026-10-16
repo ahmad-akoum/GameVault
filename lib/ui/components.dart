@@ -9,10 +9,12 @@ class GameArtwork extends StatelessWidget {
     this.url,
     required this.title,
     this.fit = BoxFit.cover,
+    this.fullResolution = false,
   });
   final String? path, url;
   final String title;
   final BoxFit fit;
+  final bool fullResolution;
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -61,7 +63,7 @@ class GameArtwork extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final decodeWidth = width.isFinite && width > 0
+        final decodeWidth = !fullResolution && width.isFinite && width > 0
             ? (width * MediaQuery.devicePixelRatioOf(context)).ceil().clamp(
                 1,
                 4096,

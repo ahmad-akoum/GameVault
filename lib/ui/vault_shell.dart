@@ -117,9 +117,7 @@ class _VaultShellState extends State<VaultShell> {
           Container(
             width: compact ? 78 : 214,
             decoration: BoxDecoration(
-              color: scheme.brightness == Brightness.dark
-                  ? const Color(0xff0d111a)
-                  : const Color(0xffeaece7),
+              color: scheme.surfaceContainerLow,
               border: Border(right: BorderSide(color: scheme.outlineVariant)),
             ),
             child: Column(

@@ -95,8 +95,18 @@ class _GameVaultAppState extends State<GameVaultApp> with WindowListener {
       return MaterialApp(
         title: 'GameVault',
         debugShowCheckedModeBanner: false,
-        theme: vaultTheme(Brightness.light, settings.accent),
-        darkTheme: vaultTheme(Brightness.dark, settings.accent),
+        theme: vaultTheme(
+          Brightness.light,
+          settings.accent,
+          background: settings.background,
+          surface: settings.surface,
+        ),
+        darkTheme: vaultTheme(
+          Brightness.dark,
+          settings.accent,
+          background: settings.background,
+          surface: settings.surface,
+        ),
         themeMode: switch (settings.theme) {
           AppearanceMode.dark => ThemeMode.dark,
           AppearanceMode.light => ThemeMode.light,

@@ -2,6 +2,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:gamevault/models/game.dart';
 import 'package:gamevault/services/windows_games.dart';
@@ -21,6 +22,12 @@ Future<void> main() async {
     Directory(p.join(root, 'build', 'native_smoke_data')),
   );
   try {
+    final version = await const MethodChannel(
+      'gamevault/windows',
+    ).invokeMethod<String>('appVersion', <String, Object>{});
+    if (version != '2.1.0+3') {
+      throw StateError('Unexpected Windows build version');
+    }
     final platform = WindowsGames();
     final executable = p.join(root, 'build', 'native_fixture.exe');
     final g = VaultGame(
@@ -99,6 +106,7 @@ Future<void> main() async {
     await output.writeAsString(
       const JsonEncoder.withIndent('  ').convert({
         'passed': true,
+        'version': version,
         'launch': 'real ShellExecute .exe launch',
         'detected': true,
         'terminationDetected': true,

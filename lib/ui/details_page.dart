@@ -4,6 +4,8 @@ import '../models/game.dart';
 import '../state/vault_controller.dart';
 import 'components.dart';
 import 'tracking_controls.dart';
+import 'appearance_controls.dart';
+import 'artwork_viewer.dart';
 
 class DetailsPage extends StatefulWidget {
   const DetailsPage({
@@ -49,6 +51,12 @@ class _DetailsPageState extends State<DetailsPage> {
       );
     }
     final scheme = Theme.of(context).colorScheme;
+    final profile = c.settings.profileSize;
+    final gap = profile == ProfileSize.compact
+        ? 14.0
+        : profile == ProfileSize.expanded
+        ? 34.0
+        : 22.0;
     return ListView(
       children: [
         Align(
@@ -60,14 +68,43 @@ class _DetailsPageState extends State<DetailsPage> {
           ),
         ),
         const SizedBox(height: 12),
+        ProfileSizeControl(
+          value: profile,
+          onChanged: (v) => c.setSettings(c.settings.copy(profileSize: v)),
+        ),
+        const SizedBox(height: 12),
         SizedBox(
-          height: 260,
+          key: const ValueKey('profileArtwork'),
+          height: switch (profile) {
+            ProfileSize.compact => 180,
+            ProfileSize.comfortable => 260,
+            ProfileSize.expanded => 420,
+          },
           child: ClipRRect(
             borderRadius: BorderRadius.circular(6),
-            child: GameArtwork(path: g.heroPath ?? g.coverPath, title: g.title),
+            child: Tooltip(
+              message: 'Enlarge artwork',
+              child: InkWell(
+                onTap: () => showDialog<void>(
+                  context: context,
+                  builder: (_) => ArtworkViewer(
+                    title: g.title,
+                    path: g.heroPath ?? g.coverPath,
+                  ),
+                ),
+                child: Semantics(
+                  button: true,
+                  label: 'Enlarge artwork',
+                  child: GameArtwork(
+                    path: g.heroPath ?? g.coverPath,
+                    title: g.title,
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
-        const SizedBox(height: 26),
+        SizedBox(height: gap),
         Text(g.title, style: Theme.of(context).textTheme.headlineLarge),
         const SizedBox(height: 8),
         Text(
@@ -79,9 +116,9 @@ class _DetailsPageState extends State<DetailsPage> {
           ].join('  •  '),
           style: TextStyle(color: scheme.onSurfaceVariant),
         ),
-        const SizedBox(height: 22),
+        SizedBox(height: gap),
         TrackingControls(controller: c, game: g),
-        const SizedBox(height: 22),
+        SizedBox(height: gap),
         Wrap(
           spacing: 12,
           runSpacing: 12,
@@ -123,7 +160,7 @@ class _DetailsPageState extends State<DetailsPage> {
             ),
           ],
         ),
-        const SizedBox(height: 30),
+        SizedBox(height: gap),
         const Divider(),
         const SizedBox(height: 28),
         Row(
@@ -277,9 +314,9 @@ class _DetailsPageState extends State<DetailsPage> {
               ),
           ],
         ),
-        const SizedBox(height: 26),
+        SizedBox(height: gap),
         const Divider(),
-        const SizedBox(height: 26),
+        SizedBox(height: gap),
         const SectionTitle('Critic ratings'),
         const Text(
           'Ratings are not connected. An authorized Metacritic or OpenCritic data source is required; no score is inferred.',

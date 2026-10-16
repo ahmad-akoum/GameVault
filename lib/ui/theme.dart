@@ -1,27 +1,60 @@
 import 'package:flutter/material.dart';
 
-ThemeData vaultTheme(Brightness brightness, int accent) {
+// Custom hues adapt to the selected mode so every surface remains readable.
+Color appearanceSurface(int value, Brightness brightness) {
+  final color = HSLColor.fromColor(Color(value));
+  final lightness = brightness == Brightness.dark
+      ? color.lightness.clamp(0.03, 0.20)
+      : color.lightness.clamp(0.85, 0.98);
+  return color.withLightness(lightness).toColor();
+}
+
+ThemeData vaultTheme(
+  Brightness brightness,
+  int accent, {
+  int? background,
+  int? surface,
+}) {
   final dark = brightness == Brightness.dark;
   final seeded = ColorScheme.fromSeed(
     seedColor: Color(accent),
     brightness: brightness,
   );
-  final primary = dark && Color(accent).computeLuminance() >= 0.2
+  final bg = background == null
+      ? (dark ? const Color(0xff101520) : const Color(0xfff5f5f2))
+      : appearanceSurface(background, brightness);
+  final panel = surface == null
+      ? (dark ? const Color(0xff182130) : const Color(0xffeaece8))
+      : appearanceSurface(surface, brightness);
+  var primary = dark && Color(accent).computeLuminance() >= 0.2
       ? Color(accent)
       : seeded.primary;
+  double contrast(Color a, Color b) {
+    final x = a.computeLuminance(), y = b.computeLuminance();
+    return (x > y ? (x + .05) / (y + .05) : (y + .05) / (x + .05));
+  }
+
+  for (
+    var i = 0;
+    i < 20 && (contrast(primary, bg) < 4.5 || contrast(primary, panel) < 4.5);
+    i++
+  ) {
+    primary = Color.lerp(primary, dark ? Colors.white : Colors.black, .15)!;
+  }
+  final ink = dark ? Colors.white : const Color(0xff17191d);
   final scheme = seeded.copyWith(
-    surface: dark ? const Color(0xff101520) : const Color(0xfff5f5f2),
-    onSurface: dark ? const Color(0xffe7e8eb) : const Color(0xff22252a),
-    onSurfaceVariant: dark ? const Color(0xffa0a5ae) : const Color(0xff5b626a),
-    surfaceContainer: dark ? const Color(0xff182130) : const Color(0xffeaece8),
-    surfaceContainerHighest: dark
-        ? const Color(0xff202c3d)
-        : const Color(0xffe0e3dd),
+    surface: bg,
+    onSurface: ink,
+    onSurfaceVariant: Color.lerp(ink, panel, .20),
+    surfaceContainer: panel,
+    surfaceContainerLow: panel,
+    surfaceContainerHigh: panel,
+    surfaceContainerHighest: Color.lerp(panel, ink, .04),
     primary: primary,
     onPrimary: primary.computeLuminance() > 0.179
         ? const Color(0xff101520)
         : Colors.white,
-    outlineVariant: dark ? const Color(0xff2b384b) : const Color(0xffd4d8d1),
+    outlineVariant: Color.lerp(panel, ink, .22),
   );
   final radius = RoundedRectangleBorder(
     borderRadius: BorderRadius.circular(10),
