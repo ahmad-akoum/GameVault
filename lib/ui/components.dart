@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../models/game.dart';
+import 'artwork_image.dart';
 
 class GameArtwork extends StatelessWidget {
   const GameArtwork({
@@ -62,26 +63,36 @@ class GameArtwork extends StatelessWidget {
     );
     return LayoutBuilder(
       builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        final decodeWidth = !fullResolution && width.isFinite && width > 0
-            ? (width * MediaQuery.devicePixelRatioOf(context)).ceil().clamp(
-                1,
-                4096,
-              )
-            : null;
+        final dpr = MediaQuery.devicePixelRatioOf(context);
+        ImageProvider sized(ImageProvider source) {
+          if (fullResolution ||
+              !constraints.hasBoundedWidth ||
+              !constraints.hasBoundedHeight ||
+              constraints.maxWidth <= 0 ||
+              constraints.maxHeight <= 0) {
+            return source;
+          }
+          return ArtworkImage(
+            source,
+            artworkBucket(constraints.maxWidth * dpr),
+            artworkBucket(constraints.maxHeight * dpr),
+            fit,
+          );
+        }
+
         Widget remote() => url == null
             ? fallback()
-            : Image.network(
-                url!,
+            : Image(
+                image: sized(NetworkImage(url!)),
                 fit: fit,
-                cacheWidth: decodeWidth,
+                filterQuality: FilterQuality.medium,
                 errorBuilder: (_, error, stack) => fallback(),
               );
         if (path == null) return remote();
-        return Image.file(
-          File(path!),
+        return Image(
+          image: sized(FileImage(File(path!))),
           fit: fit,
-          cacheWidth: decodeWidth,
+          filterQuality: FilterQuality.medium,
           errorBuilder: (_, error, stack) => remote(),
         );
       },
