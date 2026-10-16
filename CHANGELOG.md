@@ -9,3 +9,5 @@ Existing V2 source preserved as a release candidate. Original owner acceptance w
 
 ## 1.0.0 - historical source
 Genuine pre-V2 source was recovered from Git history: selective Steam imports, metadata/artwork, HLTB matching, statuses, favorites, search/filter/sort and basic appearance. This entry does not invent an earlier public binary release.
+
+V2.0 final stabilization also fixes normal Windows close: the runner explicitly destroys the window/engine before COM teardown. The prior unpublished preparation is retained as a checkpoint; no published tag or release is replaced.

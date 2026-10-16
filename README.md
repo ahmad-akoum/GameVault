@@ -125,3 +125,5 @@ Metacritic, RAWG or IGDB. External services and their data remain subject to the
 ## Stabilization
 
 Settings uses actual Windows build metadata. Idle polls avoid redundant rebuilds; artwork decoding is bounded and file existence checks no longer block widget builds. No measured high-refresh FPS claim. See [V2.0 release notes](docs/releases/v2.0.0.md). HLTB website access is not cleared for public distribution; see [licensing](docs/LICENSING.md).
+
+V2.0 final stabilization also fixes normal Windows close: the runner explicitly destroys the window/engine before COM teardown. The prior unpublished preparation is retained as a checkpoint; no published tag or release is replaced.

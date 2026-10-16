@@ -38,6 +38,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     ::DispatchMessage(&msg);
   }
 
+  // window_manager posts WM_QUIT without destroying the window. Tear down
+  // the engine while the derived window and COM apartment are still alive.
+  window.Destroy();
   ::CoUninitialize();
   return EXIT_SUCCESS;
 }
