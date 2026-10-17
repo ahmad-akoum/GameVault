@@ -17,19 +17,23 @@ Future<void> main() async {
     ),
   );
   final root = Platform.environment['GAMEVAULT_PROJECT_ROOT']!;
-  final output = File(p.join(root, 'build', 'native_smoke_result.json'));
-  final store = LocalStore(
-    Directory(p.join(root, 'build', 'native_smoke_data')),
-  );
+  final configuredBuild =
+      Platform.environment['GAMEVAULT_BUILD_DIR'] ?? 'build';
+  final buildRoot = p.isAbsolute(configuredBuild)
+      ? configuredBuild
+      : p.join(root, configuredBuild);
+  const expectedVersion = String.fromEnvironment('GAMEVAULT_EXPECTED_VERSION');
+  final output = File(p.join(buildRoot, 'native_smoke_result.json'));
+  final store = LocalStore(Directory(p.join(buildRoot, 'native_smoke_data')));
   try {
     final version = await const MethodChannel(
       'gamevault/windows',
     ).invokeMethod<String>('appVersion', <String, Object>{});
-    if (version != '2.1.0+3') {
+    if (expectedVersion.isNotEmpty && version != expectedVersion) {
       throw StateError('Unexpected Windows build version');
     }
     final platform = WindowsGames();
-    final executable = p.join(root, 'build', 'native_fixture.exe');
+    final executable = p.join(buildRoot, 'native_fixture.exe');
     final g = VaultGame(
       appId: -1,
       title: 'Native integration fixture',
@@ -96,7 +100,7 @@ Future<void> main() async {
           title: 'Missing',
           installPath: root,
           libraryPath: root,
-          executablePath: p.join(root, 'build', 'missing.exe'),
+          executablePath: p.join(buildRoot, 'missing.exe'),
         ),
       );
     } catch (_) {

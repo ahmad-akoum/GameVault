@@ -70,6 +70,44 @@ class SteamGame {
       'https://cdn.akamai.steamstatic.com/steam/apps/$appId/library_600x900.jpg';
 }
 
+/// Additive artwork preferences. Null on legacy records until first management.
+class ArtworkPreferences {
+  const ArtworkPreferences({
+    this.originalCover,
+    this.originalHero,
+    this.covers = const [],
+    this.heroes = const [],
+    this.coverChosen = false,
+    this.heroChosen = false,
+    this.coverContained = false,
+    this.heroContained = false,
+  });
+  final String? originalCover, originalHero;
+  final List<String> covers, heroes;
+  final bool coverContained, heroContained, coverChosen, heroChosen;
+  Map<String, dynamic> toJson() => {
+    'originalCover': originalCover,
+    'originalHero': originalHero,
+    'covers': covers,
+    'heroes': heroes,
+    'coverChosen': coverChosen,
+    'heroChosen': heroChosen,
+    'coverContained': coverContained,
+    'heroContained': heroContained,
+  };
+  factory ArtworkPreferences.fromJson(Map<String, dynamic> j) =>
+      ArtworkPreferences(
+        originalCover: j['originalCover'] as String?,
+        originalHero: j['originalHero'] as String?,
+        covers: List<String>.from(j['covers'] ?? []),
+        heroes: List<String>.from(j['heroes'] ?? []),
+        coverChosen: j['coverChosen'] == true,
+        heroChosen: j['heroChosen'] == true,
+        coverContained: j['coverContained'] == true,
+        heroContained: j['heroContained'] == true,
+      );
+}
+
 class VaultGame {
   VaultGame({
     required this.appId,
@@ -80,6 +118,7 @@ class VaultGame {
     this.status = GameStatus.backlog,
     this.favorite = false,
     this.coverPath,
+    this.artwork,
     this.heroPath,
     this.release,
     this.developer,
@@ -95,6 +134,11 @@ class VaultGame {
     this.collections = const [],
     this.progressPercent,
   }) : addedAt = addedAt ?? DateTime.now();
+  final ArtworkPreferences? artwork;
+  // Freeze the legacy cover-as-banner fallback when managing artwork, so a
+  // cover change cannot silently change a game that had no separate banner.
+  String? get profileArtworkPath =>
+      heroPath ?? (artwork == null ? coverPath : artwork!.originalHero);
   final String? executablePath;
   final List<String> collections;
   final int? progressPercent;
@@ -122,6 +166,9 @@ class VaultGame {
     GameStatus? status,
     bool? favorite,
     String? coverPath,
+    ArtworkPreferences? artwork,
+    bool clearCover = false,
+    bool clearHero = false,
     String? heroPath,
     String? release,
     String? developer,
@@ -147,8 +194,9 @@ class VaultGame {
     addedAt: addedAt,
     status: status ?? this.status,
     favorite: favorite ?? this.favorite,
-    coverPath: coverPath ?? this.coverPath,
-    heroPath: heroPath ?? this.heroPath,
+    artwork: artwork ?? this.artwork,
+    coverPath: clearCover ? null : coverPath ?? this.coverPath,
+    heroPath: clearHero ? null : heroPath ?? this.heroPath,
     release: release ?? this.release,
     developer: developer ?? this.developer,
     publisher: publisher ?? this.publisher,
@@ -175,6 +223,7 @@ class VaultGame {
     'addedAt': addedAt.toIso8601String(),
     'status': status.name,
     'favorite': favorite,
+    'artwork': artwork?.toJson(),
     'coverPath': coverPath,
     'heroPath': heroPath,
     'release': release,
@@ -201,6 +250,9 @@ class VaultGame {
     addedAt: DateTime.parse(j['addedAt'] as String),
     status: GameStatus.values.byName(j['status'] as String),
     favorite: j['favorite'] == true,
+    artwork: j['artwork'] is Map
+        ? ArtworkPreferences.fromJson(Map<String, dynamic>.from(j['artwork']))
+        : null,
     coverPath: j['coverPath'] as String?,
     heroPath: j['heroPath'] as String?,
     release: j['release'] as String?,

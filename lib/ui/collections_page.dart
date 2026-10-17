@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 import '../models/game.dart';
 import '../state/vault_controller.dart';
 import 'components.dart';
+import 'responsive.dart';
 
 Future<String?> textPrompt(
   BuildContext context,
@@ -85,8 +86,7 @@ class _CollectionsPageState extends State<CollectionsPage> {
     final games = c.games
         .where((g) => selected == null || g.collections.contains(selected))
         .toList();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return ResponsivePage(
       children: [
         PageHeading(
           'Collections',
@@ -122,7 +122,7 @@ class _CollectionsPageState extends State<CollectionsPage> {
         ),
         const SizedBox(height: 16),
         if (selected != null)
-          Row(
+          AdaptiveRow(
             children: [
               TextButton.icon(
                 icon: const Icon(Icons.edit_outlined, size: 16),

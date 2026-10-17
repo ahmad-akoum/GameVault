@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import '../models/game.dart';
 import 'artwork_image.dart';
+import 'responsive.dart';
 
 class GameArtwork extends StatelessWidget {
   const GameArtwork({
@@ -107,7 +108,7 @@ class SectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 16),
-    child: Row(
+    child: AdaptiveRow(
       children: [
         Expanded(
           child: Text(title, style: Theme.of(context).textTheme.titleLarge),
@@ -125,7 +126,7 @@ class PageHeading extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 28),
-    child: Row(
+    child: AdaptiveRow(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Expanded(
@@ -160,55 +161,57 @@ class EmptyLibrary extends StatelessWidget {
   final bool filtered, favorites;
   @override
   Widget build(BuildContext context) => Center(
-    child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 510),
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              favorites ? Icons.favorite_border : Icons.shelves,
-              size: 55,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(height: 22),
-            Text(
-              filtered
-                  ? 'No games match this view'
-                  : favorites
-                  ? 'Keep your favorites close'
-                  : 'A library that’s yours',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              filtered
-                  ? 'Try another search or status filter.'
-                  : favorites
-                  ? 'Mark a game with the heart icon and it will appear here.'
-                  : 'Find the games installed in your Steam libraries, then choose the ones you want to keep in GameVault.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                height: 1.6,
+    child: SingleChildScrollView(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 510),
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                favorites ? Icons.favorite_border : Icons.shelves,
+                size: 55,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
-            ),
-            if (!filtered && !favorites) ...[
-              const SizedBox(height: 26),
-              FilledButton.icon(
-                onPressed: onScan,
-                icon: const Icon(Icons.folder_open, size: 18),
-                label: const Text('Find Steam games'),
-              ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 22),
               Text(
-                'Local library • No account required',
-                style: Theme.of(context).textTheme.bodySmall,
+                filtered
+                    ? 'No games match this view'
+                    : favorites
+                    ? 'Keep your favorites close'
+                    : 'A library that’s yours',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.headlineMedium,
               ),
+              const SizedBox(height: 12),
+              Text(
+                filtered
+                    ? 'Try another search or status filter.'
+                    : favorites
+                    ? 'Mark a game with the heart icon and it will appear here.'
+                    : 'Find the games installed in your Steam libraries, then choose the ones you want to keep in GameVault.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  height: 1.6,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              if (!filtered && !favorites) ...[
+                const SizedBox(height: 26),
+                FilledButton.icon(
+                  onPressed: onScan,
+                  icon: const Icon(Icons.folder_open, size: 18),
+                  label: const Text('Find Steam games'),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Local library • No account required',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     ),
@@ -246,7 +249,13 @@ class _GameTileState extends State<GameTile> {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: GameArtwork(path: g.coverPath, title: g.title),
+                  child: GameArtwork(
+                    path: g.coverPath,
+                    title: g.title,
+                    fit: g.artwork?.coverContained == true
+                        ? BoxFit.contain
+                        : BoxFit.cover,
+                  ),
                 ),
                 Material(
                   color: Colors.transparent,
@@ -348,16 +357,18 @@ class VaultGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, c) {
-      final count = (c.maxWidth / 205).floor().clamp(2, 8);
+      final wrap = shrinkWrap || !c.hasBoundedHeight;
+      final count = (c.maxWidth / 205).floor().clamp(1, 8);
       final width = (c.maxWidth - (count - 1) * 20) / count;
       return GridView.builder(
-        shrinkWrap: shrinkWrap,
-        physics: shrinkWrap ? const NeverScrollableScrollPhysics() : null,
+        shrinkWrap: wrap,
+        physics: wrap ? const NeverScrollableScrollPhysics() : null,
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: count,
           crossAxisSpacing: 20,
           mainAxisSpacing: 24,
-          mainAxisExtent: width * 1.48 + 56,
+          mainAxisExtent:
+              width * 1.48 + 56 * MediaQuery.textScalerOf(context).scale(1),
         ),
         itemCount: games.length,
         itemBuilder: (_, i) => GameTile(

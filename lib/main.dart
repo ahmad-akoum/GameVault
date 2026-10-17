@@ -18,7 +18,7 @@ Future<void> main() async {
   await windowManager.ensureInitialized();
   const options = WindowOptions(
     size: Size(1280, 840),
-    minimumSize: Size(880, 620),
+    minimumSize: Size(360, 620),
     center: true,
     title: 'GameVault',
     titleBarStyle: TitleBarStyle.hidden,
@@ -42,7 +42,7 @@ Future<void> main() async {
     store: store,
     scanner: SteamScanner(),
     metadata: SteamMetadataProvider(store.artwork),
-    hltb: WebsiteHltbProvider(),
+    hltb: const DisabledHltbProvider(),
     platform: WindowsGames(),
   );
   runApp(GameVaultApp(controller: controller));
@@ -112,65 +112,68 @@ class _GameVaultAppState extends State<GameVaultApp> with WindowListener {
           AppearanceMode.light => ThemeMode.light,
           AppearanceMode.system => ThemeMode.system,
         },
-        home: VaultShell(controller: widget.controller),
-        builder: widget.manageWindow
-            ? (context, child) => Column(
-                children: [
-                  Material(
-                    color: Theme.of(context).colorScheme.surface,
-                    child: SizedBox(
-                      height: 38,
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: DragToMoveArea(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                ),
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  'GAMEVAULT  /  YOUR PERSONAL PLAY SPACE',
-                                  style: TextStyle(
-                                    fontSize: 9,
-                                    letterSpacing: 1.8,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurfaceVariant,
+        home: Builder(
+          builder: (context) => widget.manageWindow
+              ? Column(
+                  children: [
+                    Material(
+                      color: Theme.of(context).colorScheme.surface,
+                      child: SizedBox(
+                        height: 38,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: DragToMoveArea(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                  ),
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    'GAMEVAULT  /  YOUR PERSONAL PLAY SPACE',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      letterSpacing: 1.8,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                          IconButton(
-                            tooltip: 'Minimize',
-                            onPressed: windowManager.minimize,
-                            icon: const Icon(Icons.remove, size: 16),
-                          ),
-                          IconButton(
-                            tooltip: 'Maximize or restore',
-                            onPressed: () async {
-                              if (await windowManager.isMaximized()) {
-                                await windowManager.unmaximize();
-                              } else {
-                                await windowManager.maximize();
-                              }
-                            },
-                            icon: const Icon(Icons.crop_square, size: 15),
-                          ),
-                          IconButton(
-                            tooltip: 'Close GameVault',
-                            onPressed: windowManager.close,
-                            icon: const Icon(Icons.close, size: 17),
-                          ),
-                        ],
+                            IconButton(
+                              tooltip: 'Minimize',
+                              onPressed: windowManager.minimize,
+                              icon: const Icon(Icons.remove, size: 16),
+                            ),
+                            IconButton(
+                              tooltip: 'Maximize or restore',
+                              onPressed: () async {
+                                if (await windowManager.isMaximized()) {
+                                  await windowManager.unmaximize();
+                                } else {
+                                  await windowManager.maximize();
+                                }
+                              },
+                              icon: const Icon(Icons.crop_square, size: 15),
+                            ),
+                            IconButton(
+                              tooltip: 'Close GameVault',
+                              onPressed: windowManager.close,
+                              icon: const Icon(Icons.close, size: 17),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  Expanded(child: child!),
-                ],
-              )
-            : null,
+                    Expanded(child: VaultShell(controller: widget.controller)),
+                  ],
+                )
+              : VaultShell(controller: widget.controller),
+        ),
       );
     },
   );

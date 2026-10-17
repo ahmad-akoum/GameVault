@@ -111,29 +111,37 @@ L Snapshot(const L& games) {
   }
   return result;
 }
-int IdleSeconds(ULONGLONG dualsense) {
-  LASTINPUTINFO input{}; input.cbSize = sizeof(input);
-  if (!GetLastInputInfo(&input)) throw std::runtime_error("Idle observation unavailable");
-  DWORD idle = GetTickCount() - input.dwTime;
-  static ULONGLONG lastController = 0;
+}
+
+int GamePlatform::IdleSeconds() {
+  if (!registered_) throw std::runtime_error("Physical input observation unavailable");
+  const auto now = GetTickCount64();
   for (DWORD index = 0; index < XUSER_MAX_COUNT; ++index) {
     XINPUT_STATE state{};
-    if (XInputGetState(index,&state) == ERROR_SUCCESS) {
+    if (XInputGetState(index, &state) == ERROR_SUCCESS) {
       const auto& g = state.Gamepad;
-      if (g.wButtons || g.bLeftTrigger > XINPUT_GAMEPAD_TRIGGER_THRESHOLD || g.bRightTrigger > XINPUT_GAMEPAD_TRIGGER_THRESHOLD ||
-          abs(g.sThumbLX) > XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE || abs(g.sThumbLY) > XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE ||
-          abs(g.sThumbRX) > XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE || abs(g.sThumbRY) > XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE) lastController = GetTickCount64();
+      ControllerSample sample;
+      sample.buttons = g.wButtons;
+      sample.axes = {g.sThumbLX, g.sThumbLY, g.sThumbRX, g.sThumbRY};
+      sample.triggers = {g.bLeftTrigger, g.bRightTrigger};
+      if (xinput_activity_[index].Observe(sample,
+          {XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE,
+           XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE, XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE},
+          1024, XINPUT_GAMEPAD_TRIGGER_THRESHOLD, 4)) last_xinput_ = now;
+    } else {
+      xinput_activity_[index].Reset();
     }
   }
-  lastController = std::max(lastController, dualsense);
-  if (lastController != 0) idle = static_cast<DWORD>(std::min<ULONGLONG>(idle,GetTickCount64()-lastController));
-  return static_cast<int>(idle / 1000);
-}
+  return ObservedIdleSeconds(now, last_keyboard_mouse_, last_dualsense_, last_xinput_);
 }
 
 GamePlatform::GamePlatform(flutter::BinaryMessenger* messenger, HWND window) : window_(window) {
-  RAWINPUTDEVICE device{0x01, 0x05, RIDEV_INPUTSINK | RIDEV_DEVNOTIFY, window_};
-  registered_ = RegisterRawInputDevices(&device, 1, sizeof(device)) != FALSE;
+  last_keyboard_mouse_ = GetTickCount64();
+  RAWINPUTDEVICE devices[] = {
+      {0x01, 0x05, RIDEV_INPUTSINK | RIDEV_DEVNOTIFY, window_},
+      {0x01, 0x06, RIDEV_INPUTSINK | RIDEV_DEVNOTIFY, window_},
+      {0x01, 0x02, RIDEV_INPUTSINK | RIDEV_DEVNOTIFY, window_}};
+  registered_ = RegisterRawInputDevices(devices, 3, sizeof(RAWINPUTDEVICE)) != FALSE;
   channel_ = std::make_unique<flutter::MethodChannel<V>>(messenger,"gamevault/windows",&flutter::StandardMethodCodec::GetInstance());
   channel_->SetMethodCallHandler([this](const flutter::MethodCall<V>& call, std::unique_ptr<flutter::MethodResult<V>> result) {
     const auto* args = call.arguments() ? std::get_if<M>(call.arguments()) : nullptr;
@@ -144,7 +152,7 @@ GamePlatform::GamePlatform(flutter::BinaryMessenger* messenger, HWND window) : w
       } else if (call.method_name() == "sample") {
         const auto* value = Field(*args,"games"); const auto* games = value ? std::get_if<L>(value) : nullptr;
         if (!games) { result->Error("invalid_arguments","Missing game list"); return; }
-        result->Success(V(M{{V("games"),V(Snapshot(*games))},{V("idleSeconds"),V(IdleSeconds(last_dualsense_))}}));
+        result->Success(V(M{{V("games"),V(Snapshot(*games))},{V("idleSeconds"),V(IdleSeconds())}}));
       } else if (call.method_name() == "launch" || call.method_name() == "openWeb") {
         std::wstring target, directory;
         if (call.method_name() == "openWeb") {
@@ -170,14 +178,18 @@ GamePlatform::GamePlatform(flutter::BinaryMessenger* messenger, HWND window) : w
 
 GamePlatform::~GamePlatform() {
   if (registered_) {
-    RAWINPUTDEVICE device{0x01, 0x05, RIDEV_REMOVE, nullptr};
-    RegisterRawInputDevices(&device, 1, sizeof(device));
+    RAWINPUTDEVICE devices[] = {{0x01, 0x05, RIDEV_REMOVE, nullptr},
+        {0x01, 0x06, RIDEV_REMOVE, nullptr}, {0x01, 0x02, RIDEV_REMOVE, nullptr}};
+    RegisterRawInputDevices(devices, 3, sizeof(RAWINPUTDEVICE));
   }
 }
 
 void GamePlatform::HandleInput(UINT message, LPARAM data) {
   if (message == WM_INPUT_DEVICE_CHANGE) {
-    devices_.erase(reinterpret_cast<HANDLE>(data));
+    const auto device = reinterpret_cast<HANDLE>(data);
+    devices_.erase(device);
+    dualsense_activity_.erase(device);
+    mouse_activity_.erase(device);
     return;
   }
   if (message != WM_INPUT || !registered_) return;
@@ -188,6 +200,19 @@ void GamePlatform::HandleInput(UINT message, LPARAM data) {
   std::vector<BYTE> bytes(size);
   if (GetRawInputData(handle, RID_INPUT, bytes.data(), &size, sizeof(RAWINPUTHEADER)) != size) return;
   const auto* input = reinterpret_cast<const RAWINPUT*>(bytes.data());
+  // Synthetic cursor recentering/SendInput must not refresh physical idle time.
+  if (!input->header.hDevice) return;
+  if (input->header.dwType == RIM_TYPEKEYBOARD && size >= offsetof(RAWINPUT, data) + sizeof(RAWKEYBOARD)) {
+    if (input->data.keyboard.VKey != 255) last_keyboard_mouse_ = GetTickCount64();
+    return;
+  }
+  if (input->header.dwType == RIM_TYPEMOUSE && size >= offsetof(RAWINPUT, data) + sizeof(RAWMOUSE)) {
+    const auto& mouse = input->data.mouse;
+    if (mouse_activity_[input->header.hDevice].Observe(
+        (mouse.usFlags & MOUSE_MOVE_ABSOLUTE) != 0, mouse.lLastX, mouse.lLastY,
+        mouse.usButtonFlags)) last_keyboard_mouse_ = GetTickCount64();
+    return;
+  }
   if (input->header.dwType != RIM_TYPEHID || size < offsetof(RAWINPUT, data.hid.bRawData)) return;
   auto found = devices_.find(input->header.hDevice);
   if (found == devices_.end()) {
@@ -201,9 +226,11 @@ void GamePlatform::HandleInput(UINT message, LPARAM data) {
   const size_t available = size - offsetof(RAWINPUT, data.hid.bRawData);
   if (!hid.dwSizeHid || hid.dwCount > available / hid.dwSizeHid) return;
   for (DWORD i = 0; i < hid.dwCount; ++i) {
-    if (DualSenseActive(hid.bRawData + static_cast<size_t>(i) * hid.dwSizeHid, hid.dwSizeHid)) {
+    ControllerSample sample;
+    if (DecodeDualSense(hid.bRawData + static_cast<size_t>(i) * hid.dwSizeHid, hid.dwSizeHid, sample) &&
+        dualsense_activity_[input->header.hDevice].Observe(sample, {24,24,24,24}, 4, 30, 4)) {
       last_dualsense_ = GetTickCount64();
-      break; // Only a timestamp is retained; no button histories or input logging.
+      // Process every report in a batch so the device anchor stays current.
     }
   }
 }

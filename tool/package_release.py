@@ -1,20 +1,31 @@
 """Package only Windows runtime files; never include portable personal data."""
 import hashlib
+import argparse
 import os
 import re
 import subprocess
 import pathlib
-import sys
 import zipfile
 
-version = sys.argv[1]
+parser = argparse.ArgumentParser(description='Package a Windows portable runtime.')
+parser.add_argument('version')
+parser.add_argument('--build-dir', default=os.environ.get('GAMEVAULT_BUILD_DIR', 'build'))
+parser.add_argument('--output-dir')
+args = parser.parse_args()
+version = args.version
 if not re.fullmatch(r'\d+\.\d+\.\d+', version):
     raise SystemExit('Expected semantic release version')
 root = pathlib.Path(__file__).resolve().parents[1]
-release = root / 'build/windows/x64/runner/Release'
-out = root / 'release_artifacts/ready' / ('v' + version)
+build_root = pathlib.Path(args.build_dir)
+if not build_root.is_absolute():
+    build_root = root / build_root
+release = build_root / 'windows/x64/runner/Release'
+out = pathlib.Path(args.output_dir) if args.output_dir else root / 'release_artifacts/ready' / ('v' + version)
+if not out.is_absolute():
+    out = root / out
 out.mkdir(parents=True, exist_ok=True)
-actual = subprocess.check_output(['powershell', '-NoProfile', '-Command', "(Get-Item -LiteralPath './build/windows/x64/runner/Release/gamevault.exe').VersionInfo.ProductVersion"], cwd=root, text=True).strip()
+exe_path = release / 'gamevault.exe'
+actual = subprocess.check_output(['powershell', '-NoProfile', '-Command', f"(Get-Item -LiteralPath '{exe_path.as_posix()}').VersionInfo.ProductVersion"], cwd=root, text=True).strip()
 if actual.split('+')[0] != version:
     raise SystemExit('Executable version differs from requested release')
 archive = out / f'GameVault-v{version}-windows-x64.zip'

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'components.dart';
+import 'responsive.dart';
 
 class ArtworkViewer extends StatefulWidget {
   const ArtworkViewer({super.key, required this.title, this.path});
@@ -48,7 +49,8 @@ class _ArtworkViewerState extends State<ArtworkViewer> {
                 bottom: false,
                 child: Padding(
                   padding: const EdgeInsets.all(12),
-                  child: Row(
+                  child: AdaptiveRow(
+                    breakpoint: 480,
                     children: [
                       Expanded(
                         child: Text(
@@ -57,25 +59,30 @@ class _ArtworkViewerState extends State<ArtworkViewer> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      IconButton(
-                        tooltip: 'Zoom out',
-                        onPressed: () => zoom(1 / 1.25),
-                        icon: const Icon(Icons.zoom_out),
-                      ),
-                      IconButton(
-                        tooltip: 'Zoom in',
-                        onPressed: () => zoom(1.25),
-                        icon: const Icon(Icons.zoom_in),
-                      ),
-                      IconButton(
-                        tooltip: 'Reset zoom',
-                        onPressed: () => transform.value = Matrix4.identity(),
-                        icon: const Icon(Icons.fit_screen),
-                      ),
-                      IconButton(
-                        tooltip: 'Close artwork',
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.close),
+                      Wrap(
+                        children: [
+                          IconButton(
+                            tooltip: 'Zoom out',
+                            onPressed: () => zoom(1 / 1.25),
+                            icon: const Icon(Icons.zoom_out),
+                          ),
+                          IconButton(
+                            tooltip: 'Zoom in',
+                            onPressed: () => zoom(1.25),
+                            icon: const Icon(Icons.zoom_in),
+                          ),
+                          IconButton(
+                            tooltip: 'Reset zoom',
+                            onPressed: () =>
+                                transform.value = Matrix4.identity(),
+                            icon: const Icon(Icons.fit_screen),
+                          ),
+                          IconButton(
+                            tooltip: 'Close artwork',
+                            onPressed: () => Navigator.pop(context),
+                            icon: const Icon(Icons.close),
+                          ),
+                        ],
                       ),
                     ],
                   ),

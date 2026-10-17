@@ -1,4 +1,5 @@
 import 'package:gamevault/ui/components.dart';
+import 'package:gamevault/ui/details_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gamevault/main.dart';
@@ -165,7 +166,12 @@ void main() {
       await tester.scrollUntilVisible(
         find.text('HOW LONG TO BEAT'),
         250,
-        scrollable: find.byType(Scrollable).first,
+        scrollable: find
+            .descendant(
+              of: find.byType(DetailsPage),
+              matching: find.byType(Scrollable),
+            )
+            .first,
       );
       await tester.pumpAndSettle();
       expect(find.text('HOW LONG TO BEAT'), findsOneWidget);
@@ -173,7 +179,12 @@ void main() {
       await tester.scrollUntilVisible(
         find.text('Remove from GameVault'),
         300,
-        scrollable: find.byType(Scrollable).first,
+        scrollable: find
+            .descendant(
+              of: find.byType(DetailsPage),
+              matching: find.byType(Scrollable),
+            )
+            .first,
       );
       await tester.pumpAndSettle();
       await tester.tap(find.text('Remove from GameVault'));

@@ -170,8 +170,12 @@ class VaultController extends ChangeNotifier {
           d.appId,
           (current) => current.copy(
             title: enriched.title,
-            coverPath: enriched.coverPath,
-            heroPath: enriched.heroPath,
+            coverPath: current.artwork?.coverChosen == true
+                ? current.coverPath
+                : current.coverPath ?? enriched.coverPath,
+            heroPath: current.artwork?.heroChosen == true
+                ? current.heroPath
+                : current.heroPath ?? enriched.heroPath,
             release: enriched.release,
             developer: enriched.developer,
             publisher: enriched.publisher,
@@ -179,7 +183,6 @@ class VaultController extends ChangeNotifier {
             metadataMessage: enriched.metadataMessage,
           ),
         );
-        await lookup(d.appId);
       } catch (e) {
         stderr.writeln('Import enrichment: $e');
       }
@@ -203,8 +206,12 @@ class VaultController extends ChangeNotifier {
         id,
         (g) => g.copy(
           title: e.title,
-          coverPath: e.coverPath,
-          heroPath: e.heroPath,
+          coverPath: g.artwork?.coverChosen == true
+              ? g.coverPath
+              : g.coverPath ?? e.coverPath,
+          heroPath: g.artwork?.heroChosen == true
+              ? g.heroPath
+              : g.heroPath ?? e.heroPath,
           release: e.release,
           developer: e.developer,
           publisher: e.publisher,
@@ -216,6 +223,52 @@ class VaultController extends ChangeNotifier {
       busy.remove(id);
       notifyListeners();
     }
+  }
+
+  Future<bool> applyArtwork(
+    int id, {
+    required bool cover,
+    required String? path,
+    required bool contained,
+    List<String> choices = const [],
+  }) async {
+    var saved = false;
+    await _mutate(() async {
+      final g = game(id);
+      if (g == null || _closing) return;
+      final old =
+          g.artwork ??
+          ArtworkPreferences(
+            originalCover: g.coverPath,
+            originalHero: g.profileArtworkPath,
+          );
+      final preferences = ArtworkPreferences(
+        coverChosen: cover || old.coverChosen,
+        heroChosen: !cover || old.heroChosen,
+        originalCover: old.originalCover,
+        originalHero: old.originalHero,
+        covers: cover
+            ? {...old.covers, ...choices, ?path}.toList()
+            : old.covers,
+        heroes: cover
+            ? old.heroes
+            : {...old.heroes, ...choices, ?path}.toList(),
+        coverContained: cover ? contained : old.coverContained,
+        heroContained: cover ? old.heroContained : contained,
+      );
+      final changed = g.copy(
+        artwork: preferences,
+        coverPath: cover ? path : null,
+        heroPath: cover ? null : path,
+        clearCover: cover && path == null,
+        clearHero: !cover && path == null,
+      );
+      saved = await _commit(
+        games.map((item) => item.appId == id ? changed : item).toList(),
+        settings,
+      );
+    });
+    return saved;
   }
 
   Future<void> launch(int id) async {

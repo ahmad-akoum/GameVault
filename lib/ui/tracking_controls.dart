@@ -1,11 +1,11 @@
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import '../models/game.dart';
-import '../models/play_session.dart';
 import '../state/vault_controller.dart';
 import 'activity_pages.dart';
 import 'components.dart';
 import 'collections_page.dart';
+import 'session_presentation.dart';
 
 class TrackingControls extends StatelessWidget {
   const TrackingControls({
@@ -18,6 +18,11 @@ class TrackingControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = controller, g = game;
+    final unknown = hasUnknownActivity(
+      c.tracker.sessions.where((s) => s.gameId == g.appId),
+    );
+    final total = c.tracker.total(g.appId),
+        active = c.tracker.total(g.appId, active: true);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -41,9 +46,16 @@ class TrackingControls extends StatelessWidget {
               ),
             ),
             Text(
-              'Session time ${playtime(c.tracker.total(g.appId))}  •  Active ${playtime(c.tracker.total(g.appId, active: true))}',
+              'Total ${sessionDuration(total)}  •  Active ${unknown ? 'Unknown' : sessionDuration(active)}  •  Inactive ${unknown ? 'Unknown' : sessionDuration(total - active)}',
             ),
           ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          c.settings.activityAdjusted
+              ? 'Statistics use active playtime.'
+              : 'Statistics use total session time.',
+          style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 12),
         Text(
@@ -182,13 +194,17 @@ class TrackingControls extends StatelessWidget {
               )
               .toList(),
         ),
-        if (c.tracker.sessions.any((s) => s.gameId == g.appId)) ...[
+        ...[
           const SizedBox(height: 24),
           const SectionTitle('Recent sessions'),
+          if (!c.tracker.sessions.any((s) => s.gameId == g.appId))
+            const Text(
+              'No recorded sessions yet. Keep GameVault open while playing.',
+            ),
           ...c.tracker.sessions.reversed
               .where((s) => s.gameId == g.appId)
               .take(5)
-              .map((s) => SessionRow(session: s)),
+              .map((s) => SessionRow(session: s, showTitle: false)),
         ],
       ],
     );
@@ -230,6 +246,7 @@ class TrackingSettings extends StatelessWidget {
             SizedBox(
               width: 240,
               child: DropdownButtonFormField<int>(
+                isExpanded: true,
                 key: ValueKey('idle-${c.settings.idleThreshold}'),
                 initialValue: c.settings.idleThreshold,
                 decoration: const InputDecoration(labelText: 'Idle threshold'),
@@ -252,6 +269,7 @@ class TrackingSettings extends StatelessWidget {
             SizedBox(
               width: 240,
               child: DropdownButtonFormField<int>(
+                isExpanded: true,
                 key: ValueKey('focus-${c.settings.focusGrace}'),
                 initialValue: c.settings.focusGrace,
                 decoration: const InputDecoration(

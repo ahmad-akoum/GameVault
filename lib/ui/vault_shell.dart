@@ -17,6 +17,7 @@ class VaultShell extends StatefulWidget {
 }
 
 class _VaultShellState extends State<VaultShell> {
+  final scaffoldKey = GlobalKey<ScaffoldState>();
   int page = 0;
   int? detail;
   GameStatus? initialStatus;
@@ -73,7 +74,8 @@ class _VaultShellState extends State<VaultShell> {
         ),
       );
     }
-    final compact = MediaQuery.sizeOf(context).width < 1050;
+    final narrow = MediaQuery.sizeOf(context).width < 600;
+    final compact = !narrow && MediaQuery.sizeOf(context).width < 1050;
     final content = detail != null
         ? DetailsPage(
             key: ValueKey(detail),
@@ -111,90 +113,115 @@ class _VaultShellState extends State<VaultShell> {
               onLibrary: () => _library(),
             ),
           };
-    return Scaffold(
-      body: Row(
-        children: [
-          Container(
-            width: compact ? 78 : 214,
-            decoration: BoxDecoration(
-              color: scheme.surfaceContainerLow,
-              border: Border(right: BorderSide(color: scheme.outlineVariant)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    compact ? 19 : 24,
-                    20,
-                    compact ? 19 : 20,
-                    24,
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.inventory_2_outlined,
-                        color: scheme.primary,
-                        size: 27,
-                      ),
-                      if (!compact) ...[
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              'GameVault',
-                              style: TextStyle(
-                                fontSize: 21,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: -0.6,
+    final navigation = Container(
+      width: compact ? 78 : 214,
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        border: Border(right: BorderSide(color: scheme.outlineVariant)),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: IntrinsicHeight(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      compact ? 19 : 24,
+                      20,
+                      compact ? 19 : 20,
+                      24,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.inventory_2_outlined,
+                          color: scheme.primary,
+                          size: 27,
+                        ),
+                        if (!compact) ...[
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                'GameVault',
+                                style: TextStyle(
+                                  fontSize: 21,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: -0.6,
+                                ),
                               ),
                             ),
                           ),
-                        ),
+                        ],
                       ],
-                    ],
-                  ),
-                ),
-                _nav(0, Icons.home_outlined, 'Home', compact),
-                _nav(1, Icons.grid_view_outlined, 'My Library', compact),
-                _nav(2, Icons.favorite_border, 'Favorites', compact),
-                _nav(6, Icons.folder_outlined, 'Collections', compact),
-                _nav(5, Icons.bar_chart_rounded, 'Activity', compact),
-                const SizedBox(height: 24),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: compact ? 14 : 22),
-                  child: const Divider(),
-                ),
-                const SizedBox(height: 16),
-                _nav(4, Icons.manage_search, 'Find games', compact),
-                _nav(7, Icons.add_box_outlined, 'Add local game', compact),
-                const Spacer(),
-                _nav(3, Icons.tune, 'Settings', compact),
-                Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    compact ? 0 : 24,
-                    18,
-                    compact ? 0 : 24,
-                    22,
-                  ),
-                  child: Text(
-                    compact ? 'V2' : 'LOCAL LIBRARY  /  V2',
-                    textAlign: compact ? TextAlign.center : TextAlign.start,
-                    style: TextStyle(
-                      fontSize: 10,
-                      letterSpacing: 1.2,
-                      color: scheme.onSurfaceVariant,
                     ),
                   ),
-                ),
-              ],
+                  _nav(0, Icons.home_outlined, 'Home', compact),
+                  _nav(1, Icons.grid_view_outlined, 'My Library', compact),
+                  _nav(2, Icons.favorite_border, 'Favorites', compact),
+                  _nav(6, Icons.folder_outlined, 'Collections', compact),
+                  _nav(5, Icons.bar_chart_rounded, 'Activity', compact),
+                  const SizedBox(height: 24),
+                  Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: compact ? 14 : 22,
+                    ),
+                    child: const Divider(),
+                  ),
+                  const SizedBox(height: 16),
+                  _nav(4, Icons.manage_search, 'Find games', compact),
+                  _nav(7, Icons.add_box_outlined, 'Add local game', compact),
+                  const Spacer(),
+                  _nav(3, Icons.tune, 'Settings', compact),
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      compact ? 0 : 24,
+                      18,
+                      compact ? 0 : 24,
+                      22,
+                    ),
+                    child: Text(
+                      compact ? 'V2' : 'LOCAL LIBRARY  /  V2',
+                      textAlign: compact ? TextAlign.center : TextAlign.start,
+                      style: TextStyle(
+                        fontSize: 10,
+                        letterSpacing: 1.2,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
+        ),
+      ),
+    );
+    return Scaffold(
+      key: scaffoldKey,
+      drawer: narrow ? Drawer(child: navigation) : null,
+      body: Row(
+        children: [
+          if (!narrow) navigation,
           Expanded(
             child: Column(
               children: [
+                if (narrow)
+                  Builder(
+                    builder: (context) => Align(
+                      alignment: Alignment.centerLeft,
+                      child: IconButton(
+                        tooltip: 'Open navigation',
+                        icon: const Icon(Icons.menu),
+                        onPressed: () => Scaffold.of(context).openDrawer(),
+                      ),
+                    ),
+                  ),
                 if (c.trackingError != null)
                   Container(
                     width: double.infinity,
@@ -231,9 +258,17 @@ class _VaultShellState extends State<VaultShell> {
                 Expanded(
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(
-                      compact ? 24 : 36,
-                      30,
-                      compact ? 24 : 36,
+                      narrow
+                          ? 12
+                          : compact
+                          ? 24
+                          : 36,
+                      narrow ? 8 : 30,
+                      narrow
+                          ? 12
+                          : compact
+                          ? 24
+                          : 36,
                       24,
                     ),
                     child: content,
@@ -292,6 +327,7 @@ class _VaultShellState extends State<VaultShell> {
           child: InkWell(
             borderRadius: BorderRadius.circular(10),
             onTap: () {
+              scaffoldKey.currentState?.closeDrawer();
               if (value == 7) {
                 importExecutable(context, widget.controller);
               } else if (value == 4 && widget.controller.detected.isEmpty) {

@@ -2,8 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
 import 'package:path/path.dart' as p;
 import 'package:gamevault/models/game.dart';
 import 'package:gamevault/services/local_store.dart';
@@ -26,8 +24,10 @@ class TestMetadata implements GameMetadataProvider {
 class TestHltb implements HltbProvider {
   List<HltbEntry> results = [];
   HltbFailure? failure;
+  final searchedTitles = <String>[];
   @override
   Future<List<HltbEntry>> search(String title) async {
+    searchedTitles.add(title);
     if (failure != null) {
       throw failure!;
     }
@@ -252,75 +252,20 @@ void main() {
       },
     );
   });
-  group('HLTB protocol and matching', () {
+  group('HLTB availability and matching', () {
     test(
-      'real response schema converts seconds to hours and zero stays unavailable',
+      'public provider is disabled pending an authorized integration',
       () async {
-        final provider = WebsiteHltbProvider(
-          client: MockClient((request) async {
-            if (request.url.path.endsWith('/init')) {
-              return http.Response('{"token":"test"}', 200);
-            }
-            expect(request.headers['x-auth-token'], 'test');
-            expect(jsonDecode(request.body)['searchTerms'], ['Portal', '2']);
-            return http.Response(
-              '{"data":[{"game_id":1,"game_name":"Portal 2","comp_main":36000,"comp_plus":54000,"comp_100":0}]}',
-              200,
-            );
-          }),
-        );
-        final entry = (await provider.search('Portal 2')).single;
-        expect(entry.main, 10);
-        expect(entry.extras, 15);
-        expect(entry.complete, 0);
-      },
-    );
-    test('network failure is explicit', () async {
-      final provider = WebsiteHltbProvider(
-        client: MockClient((r) async => throw const SocketException('offline')),
-      );
-      await expectLater(
-        provider.search('Game'),
-        throwsA(
-          isA<HltbFailure>().having(
-            (e) => e.state,
-            'state',
-            HltbState.networkError,
-          ),
-        ),
-      );
-    });
-    test('rate limiting uses cooldown', () async {
-      var calls = 0;
-      final provider = WebsiteHltbProvider(
-        client: MockClient((r) async {
-          calls++;
-          return http.Response('limit', 429);
-        }),
-      );
-      await expectLater(provider.search('a'), throwsA(isA<HltbFailure>()));
-      await expectLater(provider.search('b'), throwsA(isA<HltbFailure>()));
-      expect(calls, 1);
-    });
-    test(
-      'invalid search schema is unavailable, never a successful zero result',
-      () async {
-        final provider = WebsiteHltbProvider(
-          client: MockClient(
-            (r) async => http.Response(
-              r.url.path.endsWith('/init') ? '{"token":"test"}' : '{}',
-              200,
-            ),
-          ),
-        );
         await expectLater(
-          provider.search('a'),
+          const DisabledHltbProvider().search('Game'),
           throwsA(
-            isA<HltbFailure>().having(
-              (e) => e.state,
-              'state',
-              HltbState.unavailable,
-            ),
+            isA<HltbFailure>()
+                .having((e) => e.state, 'state', HltbState.unavailable)
+                .having(
+                  (e) => e.message,
+                  'message',
+                  contains('authorized integration'),
+                ),
           ),
         );
       },
@@ -387,7 +332,8 @@ void main() {
         await c.importGames({1});
         expect(c.games.length, 1);
         expect(c.games.single.appId, 1);
-        expect(c.games.single.hltbState, HltbState.noMatch);
+        expect(c.games.single.hltbState, HltbState.pending);
+        expect(h.searchedTitles, isEmpty);
       },
     );
     test(
@@ -419,6 +365,8 @@ void main() {
           HltbEntry(id: 2, title: 'Second', main: 20),
         ];
         await c.importGames({1});
+        expect(h.searchedTitles, isEmpty);
+        await c.lookup(1);
         expect(c.game(1)!.hltbState, HltbState.ambiguous);
         await c.selectMatch(1, h.results.last);
         expect(c.game(1)!.hltb!.main, 20);

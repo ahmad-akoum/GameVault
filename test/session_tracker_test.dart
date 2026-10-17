@@ -18,6 +18,7 @@ void main() {
     int idle = 0,
     Set<String> processes = const {'1:creation'},
     int grace = 10,
+    int threshold = 60,
   }) {
     tracker.sample(
       now: origin.add(Duration(seconds: seconds)),
@@ -25,6 +26,7 @@ void main() {
       games: [GameObservation(1, 'Game', processes, focused)],
       idleSeconds: idle,
       focusGrace: grace,
+      idleThreshold: threshold,
     );
   }
 
@@ -38,6 +40,43 @@ void main() {
     expect(tracker.total(1, active: true), 60);
     tick(72, idle: 0);
     expect(tracker.total(1, active: true), 62);
+  });
+  for (final threshold in [30, 60, 120, 300, 600]) {
+    test(
+      'focused keyboard/controller idle stops at configured $threshold seconds',
+      () {
+        tick(0, threshold: threshold);
+        for (var i = 2; i <= threshold + 20; i += 2) {
+          tick(i, idle: i, threshold: threshold);
+        }
+        expect(tracker.total(1), threshold + 20);
+        expect(tracker.total(1, active: true), threshold);
+        tick(threshold + 22, idle: 0, threshold: threshold);
+        tick(threshold + 24, idle: 2, threshold: threshold);
+        expect(tracker.total(1), threshold + 24);
+        expect(tracker.total(1, active: true), threshold + 4);
+        final s = tracker.sessions.single;
+        expect(s.daily.values.fold(0, (a, b) => a + b), s.seconds);
+        expect(s.activeDaily.values.fold(0, (a, b) => a + b), s.activeSeconds);
+        tracker.closeAll('test');
+        final restored = SessionTracker()
+          ..load(jsonDecode(jsonEncode(tracker.toJson())) as List);
+        expect(restored.total(1), tracker.total(1));
+        expect(restored.total(1, active: true), tracker.total(1, active: true));
+      },
+    );
+  }
+  test('controller input while alt-tabbed cannot bypass focus grace', () {
+    tick(0);
+    for (var i = 2; i <= 40; i += 2) {
+      tick(i, focused: false, idle: 0);
+    }
+    expect(tracker.total(1), 40);
+    expect(tracker.total(1, active: true), 10);
+    tick(42, focused: true, idle: 90);
+    expect(tracker.total(1, active: true), 10);
+    tick(44, focused: true, idle: 0);
+    expect(tracker.total(1, active: true), 12);
   });
   test('focus grace is ten seconds and regaining focus resumes', () {
     tick(0);

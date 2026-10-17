@@ -77,6 +77,10 @@ class LocalStore {
                   : p.join(directory.path, path);
             }
           }
+          _artworkPaths(
+            data,
+            (path) => p.isAbsolute(path) ? path : p.join(directory.path, path),
+          );
           return VaultGame.fromJson(data);
         }).toList();
         if (games.map((g) => g.appId).toSet().length != games.length) {
@@ -107,6 +111,28 @@ class LocalStore {
     return const VaultSnapshot([], VaultSettings());
   }
 
+  // Keep originals and saved choices portable just like selected cover/hero paths.
+  static void _artworkPaths(
+    Map<String, dynamic> data,
+    String Function(String) convert,
+  ) {
+    final artwork = data['artwork'];
+    if (artwork is! Map) return;
+    for (final key in ['originalCover', 'originalHero']) {
+      if (artwork[key] is String) {
+        artwork[key] = convert(artwork[key] as String);
+      }
+    }
+    for (final key in ['covers', 'heroes']) {
+      if (artwork[key] is List) {
+        artwork[key] = (artwork[key] as List)
+            .cast<String>()
+            .map(convert)
+            .toList();
+      }
+    }
+  }
+
   Future<void> save(
     List<VaultGame> games,
     VaultSettings settings, {
@@ -123,6 +149,12 @@ class LocalStore {
             data[key] = p.relative(path, from: directory.path);
           }
         }
+        _artworkPaths(
+          data,
+          (path) => p.isWithin(directory.path, path)
+              ? p.relative(path, from: directory.path)
+              : path,
+        );
         return data;
       }).toList(),
       'settings': settings.toJson(),

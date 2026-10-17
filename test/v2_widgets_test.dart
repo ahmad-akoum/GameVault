@@ -6,9 +6,71 @@ import 'package:gamevault/services/local_store.dart';
 import 'package:gamevault/services/steam_scanner.dart';
 import 'package:gamevault/state/vault_controller.dart';
 import 'package:gamevault/ui/components.dart';
+import 'package:gamevault/ui/details_page.dart';
 import 'services_test.dart' show fixtureDirectory, TestMetadata, TestHltb;
 
 void main() {
+  testWidgets('saved HLTB estimates stay visible with live lookup disabled', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1280, 3000);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final dir = (await tester.runAsync(fixtureDirectory))!;
+    final hltb = TestHltb();
+    final c = (await tester.runAsync(() async {
+      final controller = VaultController(
+        store: LocalStore(dir),
+        scanner: SteamScanner(installationRoots: () async => []),
+        metadata: TestMetadata(),
+        hltb: hltb,
+      );
+      controller.games = [
+        VaultGame(
+          appId: 1,
+          title: 'Saved game',
+          installPath: 'x',
+          libraryPath: 'x',
+          hltbState: HltbState.matched,
+          hltb: const HltbEntry(id: 42, title: 'Saved HLTB title', main: 8),
+          candidates: const [HltbEntry(id: 43, title: 'Saved alternative')],
+        ),
+      ];
+      return controller;
+    }))!;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DetailsPage(controller: c, id: 1, onBack: () {}),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Main Story'), findsOneWidget);
+    expect(
+      find.textContaining('Source: HowLongToBeat • Saved HLTB title'),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        'Live HowLongToBeat lookup is temporarily unavailable pending an authorized integration. Saved estimates remain available.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Refresh'), findsNothing);
+    expect(find.text('Search'), findsNothing);
+    expect(find.text('Find or change the HowLongToBeat match'), findsNothing);
+    expect(hltb.searchedTitles, isEmpty);
+    await tester.tap(find.text('Previously saved matches'));
+    await tester.pumpAndSettle();
+    expect(find.text('Saved alternative'), findsOneWidget);
+    expect(find.text('Use saved match'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+    c.dispose();
+    await tester.runAsync(() => dir.delete(recursive: true));
+  });
+
   for (final size in [
     const Size(880, 582),
     const Size(1280, 802),
@@ -71,15 +133,28 @@ void main() {
       await tester.scrollUntilVisible(
         find.text('Play game'),
         200,
-        scrollable: find.byType(Scrollable).first,
+        scrollable: find
+            .descendant(
+              of: find.byType(DetailsPage),
+              matching: find.byType(Scrollable),
+            )
+            .first,
       );
       await tester.pumpAndSettle();
-      expect(find.text('Session time 0s  •  Active 0s'), findsOneWidget);
+      expect(
+        find.text('Total 0s  •  Active 0s  •  Inactive 0s'),
+        findsOneWidget,
+      );
       expect(tester.takeException(), isNull);
       await tester.scrollUntilVisible(
         find.text('Your progress'),
         200,
-        scrollable: find.byType(Scrollable).first,
+        scrollable: find
+            .descendant(
+              of: find.byType(DetailsPage),
+              matching: find.byType(Scrollable),
+            )
+            .first,
       );
       await tester.pumpAndSettle();
       await tester.runAsync(() async {

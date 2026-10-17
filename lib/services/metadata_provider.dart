@@ -16,8 +16,10 @@ class SteamMetadataProvider implements GameMetadataProvider {
   Future<String?> _image(int id, String kind, List<String> urls) async {
     await cache.create(recursive: true);
     final file = File(p.join(cache.path, '${id}_$kind.jpg'));
-    if (await file.exists() && await file.length() > 100) {
-      return file.path;
+    if (await file.exists()) {
+      // Existing cache files may be selected or retained as original artwork.
+      // Never overwrite them during metadata refresh, even if damaged.
+      return await file.length() > 100 ? file.path : null;
     }
     for (final url in urls) {
       try {

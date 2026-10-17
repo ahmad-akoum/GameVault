@@ -1,0 +1,49 @@
+# Inactivity tracking — V2.2 Stage 1
+
+Owner acceptance (2026-10-17): keyboard/mouse and DualSense Bluetooth passed real gameplay checks in How to Fish and CONTROL Resonant at 30/60 seconds, resumed input, Alt+Tab and persistence. This is owner-reported validation; no additional agent hardware test is claimed. Stage 2 preserves the approved input implementation.
+
+## Purpose and flow
+GameVault records a full observed session while the game process remains running. Active time is the part credited before the configured idle cutoff and focus-loss grace expire. Inactive time is full time minus active time. Thresholds remain the existing 30/60/120/300/600-second choices, with 60 seconds as the default. The existing focus grace defaults to 10 seconds. The idle grace is still counted as active: this change does not retroactively subtract the entire pause when the cutoff is reached.
+
+Windows collects input timestamps. The controller requests a process/focus snapshot every two seconds, then passes the idle duration and settings to SessionTracker. That tracker uses monotonic elapsed time so wall-clock adjustments cannot inflate sessions. The persistence format and existing records are unchanged.
+
+## Main implementation
+- `windows/runner/game_platform.cpp`: GamePlatform constructor registers background Raw Input for keyboard, mouse and the existing gamepad usage. HandleInput processes device reports. IdleSeconds polls existing XInput slots and combines the most recent accepted keyboard/mouse, DualSense and XInput timestamps. Snapshot matches process identity and foreground PID; it is unchanged.
+- `windows/runner/input_activity.h`: ControllerSample and ControllerActivity compare meaningful state changes against the last accepted state, retaining only a short-lived per-device anchor. MouseActivity handles relative movement, button/wheel flags and absolute-coordinate changes. ObservedIdleSeconds calculates monotonic idle age.
+- `windows/runner/dualsense_activity.h`: DecodeDualSense extracts the same sticks, triggers and buttons from USB 01/64, Bluetooth simple 01/10, padded simple 01/78, and enhanced 31/78. Report counters, sensors, battery data and unused bits are excluded. DualSenseActive remains a stateless helper for compatibility tests; runtime uses the stateful filter.
+- `windows/runner/game_platform.h`: owns per-device transient filters and three activity timestamps. Disconnect/reconnect notifications discard the relevant device anchors; XInput disconnect resets its slot.
+- `lib/services/windows_games.dart`: WindowsGames.sample carries the combined idle age and GameObservation focus/process data over the existing method channel.
+- `lib/state/vault_controller.dart`: pollGames/_sampleGames pass idleThreshold and focusGrace to accounting and retain checkpoint persistence.
+- `lib/services/session_tracker.dart`: sample applies threshold overlap to each observed interval, preserving full seconds, active seconds and daily allocations. No Dart accounting change was necessary for the reported focused-idle cutoff.
+
+## Confirmed defects and changes
+Previously every non-neutral DualSense report and every non-neutral XInput poll refreshed activity, including an unchanged held button, trigger or deflected stick. Because the shortest idle duration across all sources was used, a stationary controller could keep even a keyboard game's combined idle duration near zero. Stateful comparisons now reject identical reports and small analog noise. Button/D-pad edges and releases count once. Sticks retain the existing 24/128 DualSense dead zone and existing XInput dead zones; accepted analog changes must exceed 4 DualSense units or 1024 XInput stick units. Triggers retain the 30/255 threshold and require changes greater than four units. Slow movement accumulates against the last accepted anchor rather than disappearing because every poll resets the reference.
+
+The keyboard/mouse path previously used GetLastInputInfo as its only source. That Windows timestamp can include synthesized input, so it does not establish physical player activity. Now a non-null device-backed Raw Input keyboard event or actual mouse movement/button/wheel event refreshes the clock. Empty mouse reports and unchanged absolute coordinates do not. No key identities, input history or report contents are persisted or logged. Initial observation starts with the application startup timestamp; registration failure reports monitoring unavailable instead of silently counting active time.
+
+The specific How to Fish failure has NOT been reproduced on real hardware during Stage 1. Synthetic cursor recentering, another input source or device/driver behavior are possible explanations; the report alone does not prove which occurred. The 37-minute CONTROL result also does not prove AFK misclassification without a timed no-input interval. The fixed controller defect and Windows input-source limitation are established independently of those individual sessions.
+
+## Verification
+- `test/input_activity_test.cpp`: all four DualSense layouts, repeated held states, changing unused report bits, neutral drift, analog jitter and meaningful changes, trigger changes, D-pad changes, XInput repeated states/reset, mouse empty/relative/absolute/button/wheel reports, and combined idle clock aging/resumption.
+- `test/dualsense_activity_test.cpp`: original report-format, neutral, threshold, button, trigger, D-pad and malformed-report coverage retained.
+- `test/session_tracker_test.dart`: focused idle cutoff and resumed input for all five threshold choices, focus grace independent of controller activity, full/active totals, daily sums and persistence round trips. Existing suspend/process/recovery tests retained.
+- Static analysis and full Flutter suite: clean; 74 tests passed. Both standalone C++ suites passed with warnings treated as errors. Windows Debug build of lib/main.dart succeeded with the changed native runner, version 2.2.0-dev.1+4.
+
+## Limits and manual acceptance
+No physical keyboard, mouse, DualSense, USB/Bluetooth, Steam Input or XInput testing was performed in Stage 1. Raw Input is a practical activity signal, not proof that a human is operating a device: a virtual driver may expose device-backed reports. Devices hidden by another driver/application cannot be observed. Synthetic-only accessibility/macro input may no longer count as physical activity. Raw keyboard autorepeat from a held key still counts; an unchanged held controller state does not. This is an intentional consequence of requiring controller changes, and can undercount long stationary held-stick/button actions. XInput polling can miss a very short tap entirely between polls; DualSense Raw Input observes incoming reports.
+
+Timing uses whole seconds and approximately two-second samples. Allow a few seconds at transitions; interrupted monitoring intervals over ten seconds are deliberately excluded. Input remains shared across devices rather than attributed to a specific game, while focus gating prevents background games from indefinitely receiving active credit.
+
+## Manual test: How to Fish (keyboard)
+1. Use build/windows/x64/runner/Debug/gamevault.exe with its verified separate copy of the V2 vault; close V2.1 first. Test sessions stay in this development copy, not the active V2.1 vault. Confirm the displayed version is 2.2.0-dev.1. Use the existing idle setting, initially 30 seconds, and keep the existing focus grace.
+2. Play using keyboard/mouse for about 20 seconds, then release all controls. Leave the game focused, keep the mouse still, and leave the controller untouched. Wait at least 60 seconds. Full duration should grow throughout; active time should stop about 30 seconds after the final input. Inactive time should then grow. Looking at GameVault requires Alt+Tab, so include that interval in your observations rather than repeatedly checking during the pause.
+3. Return to the game and press a key/move the mouse. Active time should resume within a polling interval. Repeat with a 60-second threshold and at least 90 seconds untouched. Test a real held movement key separately: keyboard autorepeat should keep it active.
+4. Alt+Tab away for about 25 seconds. Active credit should stop after the configured focus grace, even if you type or move the mouse in another application. Return and resume play.
+5. Exit normally, reopen GameVault, and verify full time, active time and inactive difference survive. Report the selected thresholds and timed pauses if focused idle still fails.
+
+## Manual test: CONTROL Resonant (standard DualSense)
+1. Repeat separately with Bluetooth and Steam Input enabled, then disabled; do not change either mode mid-test. A short USB check is also useful for regression coverage. Use a safe menu/location without changing saves for testing if preferred.
+2. With 30-second idle selected, exercise buttons, both sticks, triggers and D-pad for about 20 seconds. Release everything, place the controller on a stable surface, leave the game focused and wait at least 60 seconds. Active time should stop about 30 seconds after the final meaningful input. Repeat with a 60-second threshold and a 90-second pause.
+3. Resume with each control group and verify active time resumes. Then hold one button or keep a stick stationary beyond its dead zone without changing it for longer than the threshold: repeated unchanged states must not refresh the timer. Release/repress or move the stick meaningfully to resume. Small resting stick jitter must not keep it active.
+4. Alt+Tab away for 25 seconds while using the controller. Focus grace must still stop credit. Return to the game and resume input.
+5. Exit normally and verify persisted totals. Report connection mode, Steam Input state, threshold, untouched duration and whether any controls were held; a high active percentage alone is insufficient to diagnose an idle error.

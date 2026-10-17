@@ -11,6 +11,7 @@ import 'package:gamevault/ui/appearance_controls.dart';
 import 'package:gamevault/ui/artwork_viewer.dart';
 import 'package:gamevault/ui/app_version.dart';
 import 'package:gamevault/ui/details_page.dart';
+import 'package:gamevault/ui/settings_page.dart';
 import 'package:gamevault/ui/theme.dart';
 import 'services_test.dart' show fixtureDirectory, TestMetadata, TestHltb;
 
@@ -231,7 +232,12 @@ void main() {
       await tester.scrollUntilVisible(
         find.text('Cobalt'),
         200,
-        scrollable: find.byType(Scrollable).first,
+        scrollable: find
+            .descendant(
+              of: find.byType(SettingsPage),
+              matching: find.byType(Scrollable),
+            )
+            .first,
       );
       await tester.ensureVisible(find.text('Cobalt'));
       await tester.pumpAndSettle();
@@ -245,7 +251,12 @@ void main() {
       await tester.scrollUntilVisible(
         find.text('Custom Background'),
         100,
-        scrollable: find.byType(Scrollable).first,
+        scrollable: find
+            .descendant(
+              of: find.byType(SettingsPage),
+              matching: find.byType(Scrollable),
+            )
+            .first,
       );
       await tester.ensureVisible(find.text('Custom Background'));
       await tester.pumpAndSettle();

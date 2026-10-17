@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../models/game.dart';
 import '../state/vault_controller.dart';
 import 'components.dart';
+import 'responsive.dart';
 import 'activity_pages.dart';
 
 class HomePage extends StatelessWidget {
@@ -53,7 +54,7 @@ class HomePage extends StatelessWidget {
         ),
         ActivitySummary(controller: controller),
         const SizedBox(height: 24),
-        Row(
+        AdaptiveRow(
           children: [
             _stat(
               context,
@@ -239,8 +240,7 @@ class _LibraryPageState extends State<LibraryPage> {
         const SingleActivator(LogicalKeyboardKey.keyF, control: true):
             searchFocus.requestFocus,
       },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: ResponsivePage(
         children: [
           PageHeading(
             widget.favorites ? 'Favorites' : 'My Library',
@@ -251,7 +251,8 @@ class _LibraryPageState extends State<LibraryPage> {
               label: const Text('Add games'),
             ),
           ),
-          Row(
+          AdaptiveRow(
+            breakpoint: 700,
             children: [
               Expanded(
                 child: TextField(

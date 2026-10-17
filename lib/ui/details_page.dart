@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import '../models/game.dart';
 import '../state/vault_controller.dart';
 import 'components.dart';
+import 'responsive.dart';
 import 'tracking_controls.dart';
 import 'appearance_controls.dart';
 import 'artwork_viewer.dart';
+import 'artwork_manager.dart';
 
 class DetailsPage extends StatefulWidget {
   const DetailsPage({
@@ -22,22 +24,6 @@ class DetailsPage extends StatefulWidget {
 }
 
 class _DetailsPageState extends State<DetailsPage> {
-  late final TextEditingController query;
-  bool showCandidates = false;
-  @override
-  void initState() {
-    super.initState();
-    query = TextEditingController(
-      text: widget.controller.game(widget.id)?.title ?? '',
-    );
-  }
-
-  @override
-  void dispose() {
-    query.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     final c = widget.controller;
@@ -68,9 +54,24 @@ class _DetailsPageState extends State<DetailsPage> {
           ),
         ),
         const SizedBox(height: 12),
-        ProfileSizeControl(
-          value: profile,
-          onChanged: (v) => c.setSettings(c.settings.copy(profileSize: v)),
+        Wrap(
+          spacing: 16,
+          runSpacing: 12,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            ProfileSizeControl(
+              value: profile,
+              onChanged: (v) => c.setSettings(c.settings.copy(profileSize: v)),
+            ),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.photo_library_outlined),
+              label: const Text('Manage Artwork'),
+              onPressed: () => showDialog<void>(
+                context: context,
+                builder: (_) => ArtworkManager(controller: c, id: g.appId),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 12),
         SizedBox(
@@ -87,16 +88,17 @@ class _DetailsPageState extends State<DetailsPage> {
               child: InkWell(
                 onTap: () => showDialog<void>(
                   context: context,
-                  builder: (_) => ArtworkViewer(
-                    title: g.title,
-                    path: g.heroPath ?? g.coverPath,
-                  ),
+                  builder: (_) =>
+                      ArtworkViewer(title: g.title, path: g.profileArtworkPath),
                 ),
                 child: Semantics(
                   button: true,
                   label: 'Enlarge artwork',
                   child: GameArtwork(
-                    path: g.heroPath ?? g.coverPath,
+                    path: g.profileArtworkPath,
+                    fit: g.artwork?.heroContained == true
+                        ? BoxFit.contain
+                        : BoxFit.cover,
                     title: g.title,
                   ),
                 ),
@@ -163,31 +165,18 @@ class _DetailsPageState extends State<DetailsPage> {
         SizedBox(height: gap),
         const Divider(),
         const SizedBox(height: 28),
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                'HOW LONG TO BEAT',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.7,
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-            TextButton.icon(
-              onPressed: g.hltbState == HltbState.loading
-                  ? null
-                  : () => c.lookup(g.appId),
-              icon: const Icon(Icons.refresh, size: 16),
-              label: const Text('Refresh'),
-            ),
-          ],
+        Text(
+          'HOW LONG TO BEAT',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.7,
+            color: scheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 14),
         if (g.hltb != null) ...[
-          Row(
+          AdaptiveRow(
             children: [
               _time(context, 'Main Story', g.hltb!.main),
               _time(context, 'Main + Sides', g.hltb!.extras),
@@ -210,92 +199,37 @@ class _DetailsPageState extends State<DetailsPage> {
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
-        if (g.hltbState == HltbState.loading)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 18),
-            child: Row(
-              children: [
-                const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  g.hltb == null
-                      ? 'Searching HowLongToBeat…'
-                      : 'Refreshing; saved information is shown above…',
-                ),
-              ],
-            ),
-          ),
-        if (g.hltbState != HltbState.matched &&
-            g.hltbState != HltbState.loading)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  g.hltbState == HltbState.ambiguous
-                      ? Icons.rule
-                      : Icons.info_outline,
-                  size: 20,
-                  color: scheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    g.hltbState == HltbState.pending
-                        ? 'HowLongToBeat lookup will begin after metadata is retrieved.'
-                        : '${g.hltbMessage ?? 'No completion information available.'}${g.hltb != null ? ' Previously saved information is shown above.' : ''}',
-                  ),
-                ),
-              ],
-            ),
-          ),
-        const SizedBox(height: 18),
-        ExpansionTile(
-          initiallyExpanded:
-              g.hltbState == HltbState.ambiguous ||
-              g.hltbState == HltbState.noMatch,
-          tilePadding: EdgeInsets.zero,
-          title: const Text('Find or change the HowLongToBeat match'),
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: 16, top: 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: query,
-                      onSubmitted: g.hltbState == HltbState.loading
-                          ? null
-                          : (text) {
-                              setState(() => showCandidates = true);
-                              c.lookup(g.appId, query: text);
-                            },
-                      decoration: const InputDecoration(
-                        labelText: 'Game title on HowLongToBeat',
-                        hintText: 'Try an alternate title',
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  OutlinedButton(
-                    onPressed: g.hltbState == HltbState.loading
-                        ? null
-                        : () {
-                            setState(() => showCandidates = true);
-                            c.lookup(g.appId, query: query.text);
-                          },
-                    child: const Text('Search'),
-                  ),
-                ],
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: AdaptiveRow(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.info_outline,
+                size: 20,
+                color: scheme.onSurfaceVariant,
               ),
-            ),
-            if (g.candidates.isNotEmpty &&
-                (showCandidates || g.hltbState == HltbState.ambiguous))
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Live HowLongToBeat lookup is temporarily unavailable pending an authorized integration. Saved estimates remain available.',
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (g.candidates.isNotEmpty)
+          ExpansionTile(
+            initiallyExpanded:
+                g.hltbState == HltbState.ambiguous ||
+                g.hltbState == HltbState.noMatch,
+            tilePadding: EdgeInsets.zero,
+            title: const Text('Previously saved matches'),
+            children: [
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: Text('These saved choices are available offline.'),
+              ),
               ...g.candidates.map(
                 (e) => ListTile(
                   contentPadding: EdgeInsets.zero,
@@ -304,16 +238,13 @@ class _DetailsPageState extends State<DetailsPage> {
                     '${e.year != null && e.year! > 0 ? '${e.year} • ' : ''}${e.main > 0 ? '${e.main.toStringAsFixed(1)} hours main story' : 'Main story time unavailable'}',
                   ),
                   trailing: OutlinedButton(
-                    onPressed: () {
-                      setState(() => showCandidates = false);
-                      c.selectMatch(g.appId, e);
-                    },
-                    child: const Text('Use this match'),
+                    onPressed: () => c.selectMatch(g.appId, e),
+                    child: const Text('Use saved match'),
                   ),
                 ),
               ),
-          ],
-        ),
+            ],
+          ),
         SizedBox(height: gap),
         const Divider(),
         SizedBox(height: gap),
@@ -339,7 +270,7 @@ class _DetailsPageState extends State<DetailsPage> {
         const SizedBox(height: 28),
         const Divider(),
         const SizedBox(height: 20),
-        Row(
+        AdaptiveRow(
           children: [
             Expanded(
               child: Text(
@@ -396,7 +327,7 @@ class _DetailsPageState extends State<DetailsPage> {
   );
   Widget _metadata(BuildContext context, String label, String value) => Padding(
     padding: const EdgeInsets.only(bottom: 12),
-    child: Row(
+    child: AdaptiveRow(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(

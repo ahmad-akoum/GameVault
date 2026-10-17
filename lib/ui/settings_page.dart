@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import '../state/vault_controller.dart';
 import 'components.dart';
+import 'responsive.dart';
 import 'app_version.dart';
 import 'appearance_controls.dart';
 import 'tracking_controls.dart';
@@ -124,6 +125,7 @@ class SettingsPage extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Add a Steam library'),
+        scrollable: true,
         content: SizedBox(
           width: 540,
           child: Column(
@@ -134,7 +136,7 @@ class SettingsPage extends StatelessWidget {
                 'Select the folder containing steamapps, or enter its path.',
               ),
               const SizedBox(height: 18),
-              Row(
+              AdaptiveRow(
                 children: [
                   Expanded(
                     child: TextField(

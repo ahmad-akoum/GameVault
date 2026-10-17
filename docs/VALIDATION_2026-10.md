@@ -1,3 +1,10 @@
+# Historical validation — before V2.2.0
+
+This report records V2.0/V2.1 validation before the V2.2.0 distribution change.
+In V2.2.0, live HowLongToBeat lookup, refresh and website-script inspection are
+disabled; saved local values remain visible. See `docs/releases/v2.2.0.md` for
+the current behavior. The broader data-rights question remains unresolved.
+
 # Stabilization validation
 
 V2.0: Flutter analysis passed; all 53 existing Flutter tests passed. Standalone native parser tests cover four DualSense report layouts, neutral input, drift boundary, both stick directions, triggers, all face/shoulder buttons, D-pad and malformed reports.

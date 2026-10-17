@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../state/vault_controller.dart';
 import 'components.dart';
+import 'responsive.dart';
 
 class DetectedPage extends StatefulWidget {
   const DetectedPage({
@@ -31,8 +32,7 @@ class _DetectedPageState extends State<DetectedPage> {
               (!unimportedOnly || c.game(g.appId) == null),
         )
         .toList();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return ResponsivePage(
       children: [
         PageHeading(
           'Find your games',
@@ -44,7 +44,7 @@ class _DetectedPageState extends State<DetectedPage> {
           ),
         ),
         if (c.scanning) const LinearProgressIndicator(minHeight: 2),
-        Row(
+        AdaptiveRow(
           children: [
             Expanded(
               child: TextField(
@@ -81,7 +81,7 @@ class _DetectedPageState extends State<DetectedPage> {
           ],
         ),
         const SizedBox(height: 16),
-        Row(
+        AdaptiveRow(
           children: [
             Text(
               '${c.detected.length} detected',
@@ -159,105 +159,116 @@ class _DetectedPageState extends State<DetectedPage> {
                     ],
                   ),
                 )
-              : ListView.separated(
-                  itemCount: games.length,
-                  separatorBuilder: (_, i) => const Divider(),
-                  itemBuilder: (context, i) {
-                    final g = games[i];
-                    final imported = c.game(g.appId) != null;
-                    final checked = selected.contains(g.appId);
-                    return Material(
-                      color: checked
-                          ? Theme.of(
-                              context,
-                            ).colorScheme.primary.withValues(alpha: 0.07)
-                          : Colors.transparent,
-                      child: InkWell(
-                        onTap: imported || c.importing
-                            ? null
-                            : () => setState(
-                                () => checked
-                                    ? selected.remove(g.appId)
-                                    : selected.add(g.appId),
-                              ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 10,
-                            horizontal: 8,
-                          ),
-                          child: Row(
-                            children: [
-                              Checkbox(
-                                value: imported || checked,
-                                onChanged: imported || c.importing
-                                    ? null
-                                    : (v) => setState(
-                                        () => v!
-                                            ? selected.add(g.appId)
-                                            : selected.remove(g.appId),
-                                      ),
-                              ),
-                              const SizedBox(width: 8),
-                              SizedBox(
-                                width: 48,
-                                height: 70,
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(3),
-                                  child: GameArtwork(
-                                    url: g.coverUrl,
-                                    title: g.name,
+              : LayoutBuilder(
+                  builder: (context, constraints) => ListView.separated(
+                    shrinkWrap: !constraints.hasBoundedHeight,
+                    physics: !constraints.hasBoundedHeight
+                        ? const NeverScrollableScrollPhysics()
+                        : null,
+                    itemCount: games.length,
+                    separatorBuilder: (_, i) => const Divider(),
+                    itemBuilder: (context, i) {
+                      final g = games[i];
+                      final imported = c.game(g.appId) != null;
+                      final checked = selected.contains(g.appId);
+                      return Material(
+                        color: checked
+                            ? Theme.of(
+                                context,
+                              ).colorScheme.primary.withValues(alpha: 0.07)
+                            : Colors.transparent,
+                        child: InkWell(
+                          onTap: imported || c.importing
+                              ? null
+                              : () => setState(
+                                  () => checked
+                                      ? selected.remove(g.appId)
+                                      : selected.add(g.appId),
+                                ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 10,
+                              horizontal: 8,
+                            ),
+                            child: AdaptiveRow(
+                              children: [
+                                Checkbox(
+                                  value: imported || checked,
+                                  onChanged: imported || c.importing
+                                      ? null
+                                      : (v) => setState(
+                                          () => v!
+                                              ? selected.add(g.appId)
+                                              : selected.remove(g.appId),
+                                        ),
+                                ),
+                                const SizedBox(width: 8),
+                                SizedBox(
+                                  width: 48,
+                                  height: 70,
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(3),
+                                    child: GameArtwork(
+                                      url: g.coverUrl,
+                                      title: g.name,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: 18),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      g.name,
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.titleMedium,
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'Steam ${g.appId} • ${g.libraryPath}',
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.bodySmall,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Text(
-                                imported
-                                    ? 'In your vault'
-                                    : checked
-                                    ? 'Selected'
-                                    : 'Not added',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: imported || checked
-                                      ? Theme.of(context).colorScheme.primary
-                                      : Theme.of(
+                                const SizedBox(width: 18),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        g.name,
+                                        style: Theme.of(
                                           context,
-                                        ).colorScheme.onSurfaceVariant,
+                                        ).textTheme.titleMedium,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Steam ${g.appId} • ${g.libraryPath}',
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.bodySmall,
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 10),
-                            ],
+                                Flexible(
+                                  child: Text(
+                                    imported
+                                        ? 'In your vault'
+                                        : checked
+                                        ? 'Selected'
+                                        : 'Not added',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: imported || checked
+                                          ? Theme.of(
+                                              context,
+                                            ).colorScheme.primary
+                                          : Theme.of(
+                                              context,
+                                            ).colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
         ),
         const Divider(),
         Padding(
           padding: const EdgeInsets.only(top: 16),
-          child: Row(
+          child: AdaptiveRow(
             children: [
               Expanded(
                 child: Column(
