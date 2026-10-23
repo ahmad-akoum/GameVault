@@ -45,8 +45,11 @@ live cover badge. No pending update recorded never means fully up to date.
 
 `SteamUpdateBadge` sits at the cover's top left; favorite controls remain clear.
 `SteamUpdateAction` replaces the Play button in `TrackingControls` only when
-`evidence.badge` confirms a pending state. It is an amber, non-interactive Chip;
-clicking it cannot launch or modify a game. Unknown, completed/no-pending and
+`evidence.badge` confirms a pending state. It is an amber OutlinedButton calling
+the existing
+`VaultController.openGameLocation(..., steam: true)` action. Clicking it opens
+that AppID's Steam library page; it cannot launch a game or manage downloads.
+Unknown, completed/no-pending and
 Last known evidence retain Play. The normal controller notification rebuild
 restores Play automatically after completion, without changing detection or
 refresh intervals. Local games ignore Steam evidence.
@@ -99,3 +102,47 @@ Unknown/Last known fallback, non-interactive status, native Steam dispatch,
 local-game exclusion and light/dark 360-pixel layouts. Existing service tests
 continue to cover evidence classification; real Steam download transitions
 still require owner acceptance and are not simulated by starting downloads.
+
+## Candidate 4 interactive actions (Issue #14)
+
+Candidate 3's non-interactive Chip was intentional but prevented the owner from
+using the primary action to reach Steam. `SteamUpdateAction` now requires an
+`onOpen` callback. `TrackingControls` wires every pending state to the same
+existing navigation route. Available shows a persistent short instruction to
+start the update manually in Steam; every status has a navigation tooltip.
+The secondary Steam and file-location buttons stay independent and unchanged.
+
+### Automatic update investigation
+
+No reliable, supported update-only request for arbitrary installed retail games
+was verified. Therefore no automatic update initiation is implemented or claimed.
+The existing native `openSteam` path dispatches only
+`steam://nav/games/details/<AppID>`; `rungameid` remains exclusive to Play.
+Navigation success is not download success. No install/validate commands,
+SteamCMD, private interfaces, manifest writes, or download UI automation are used.
+
+[Valve's ISteamApps reference](https://partner.steamgames.com/doc/api/ISteamApps#MarkContentCorrupt)
+documents MarkContentCorrupt as forcing verification on a subsequent launch,
+not a launcher endpoint to start a pending update for a supplied game AppID.
+It is not suitable here. Valve's
+[Remote Downloads help](https://help.steampowered.com/en/faqs/view/1025-BD94-12FC-3409)
+describes user-managed downloads via authenticated Steam pages/mobile, not a
+verified update-only desktop URI contract. The Valve Developer Community
+[protocol](https://developer.valvesoftware.com/wiki/Steam_browser_protocol) and
+[SteamCMD](https://developer.valvesoftware.com/wiki/SteamCMD) pages returned HTTP
+403 in this research session. Their unavailable contents were not treated as
+verified documentation and no access restriction was bypassed. The conclusion
+is deliberately limited to no supported method verified for this integration.
+
+### Verification
+
+`profile_actions_test.dart` asserts the exact single native openSteam call and
+AppID for all five pending states, no Play callback/pending launch, correct
+manual guidance, unchanged secondary action, completion/unknown/last-known
+fallback, Play callback dispatch, unavailable-Steam error, and all three profile
+sizes at 360 pixels in light/dark themes. The recording controller overrides
+only Play in this UI fixture; existing installation tests separately verify
+native Steam launch dispatch. Full Flutter, native, analysis and isolated
+Windows build checks remain required. Actual Steam download transitions are
+owner acceptance tests; navigation cannot guarantee Steam's independent
+scheduler does not change state on its own.
