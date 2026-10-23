@@ -1,5 +1,9 @@
 # GameVault
 
+Development follows [the contribution guide](CONTRIBUTING.md) and
+[review/release instructions](docs/DEVELOPMENT.md). CI verifies PRs; it never
+publishes a release automatically.
+
 A local-first Flutter Windows game library: discover installed games, choose what to import, launch them, and track new play sessions.
 
 **V2.2.0 - Session, artwork and responsive-layout update.**

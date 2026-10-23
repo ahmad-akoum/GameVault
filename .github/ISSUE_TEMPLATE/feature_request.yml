@@ -1,0 +1,28 @@
+name: Feature request
+description: Propose a focused improvement for review.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Problem or goal
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Proposed behavior and why it helps
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Describe observable outcomes; propose a version only if already approved.
+      placeholder: "- [ ] …"
+    validations:
+      required: true
+  - type: textarea
+    id: related
+    attributes:
+      label: Related issues, alternatives and limits (optional)
