@@ -13,6 +13,22 @@ import 'package:gamevault/ui/tracking_controls.dart';
 import 'package:gamevault/ui/steam_update_indicator.dart';
 import 'services_test.dart' show TestMetadata, TestHltb;
 
+// Records Play dispatch without launching a real game or starting the monitor.
+class ActionTestController extends VaultController {
+  ActionTestController(Directory dir)
+    : super(
+        store: LocalStore(dir),
+        scanner: SteamScanner(installationRoots: () async => []),
+        metadata: TestMetadata(),
+        hltb: TestHltb(),
+      );
+  final launched = <int>[];
+  @override
+  Future<void> launch(int id) async {
+    launched.add(id);
+  }
+}
+
 void main() {
   testWidgets(
     'verified transitions replace launch in place, unknown and completed restore it; external actions stay visible',
@@ -25,12 +41,7 @@ void main() {
         () => Directory.systemTemp.createTemp('profile_actions_'),
       ))!;
       final c = (await tester.runAsync(() async {
-        final controller = VaultController(
-          store: LocalStore(dir),
-          scanner: SteamScanner(installationRoots: () async => []),
-          metadata: TestMetadata(),
-          hltb: TestHltb(),
-        );
+        final controller = ActionTestController(dir);
         await controller.initialize();
         return controller;
       }))!;
@@ -94,7 +105,18 @@ void main() {
         );
         await tester.tap(find.byType(SteamUpdateAction));
         expect(c.pendingLaunches, isEmpty);
-        expect(calls, isEmpty);
+        await tester.pump();
+        expect(calls.single.method, 'openSteam');
+        expect(calls.single.arguments, {'steamId': 1});
+        expect(c.launched, isEmpty);
+        expect(c.error, isNull);
+        calls.clear();
+        expect(
+          find.text(
+            'Opens this game in Steam. Start the update there manually.',
+          ),
+          state == SteamUpdateState.available ? findsOneWidget : findsNothing,
+        );
         expect(find.text('Open in Steam'), findsOneWidget);
         expect(find.text('Open File Location'), findsOneWidget);
       }
@@ -114,26 +136,50 @@ void main() {
         expect(find.text('Play game'), findsOneWidget);
         expect(find.byType(SteamUpdateAction), findsNothing);
       }
+      await tester.tap(find.text('Play game'));
+      expect(c.launched, [1]);
+      expect(calls, isEmpty);
       await tester.tap(find.text('Open in Steam'));
       await tester.pump();
       expect(calls.single.method, 'openSteam');
       expect(calls.single.arguments, {'steamId': 1});
-      tester.view.physicalSize = const Size(360, 700);
-      for (final dark in [false, true]) {
-        await render(
-          const SteamUpdateEvidence(
-            SteamUpdateState.downloading,
-            'Verified fixture.',
-          ),
-          dark: dark,
-        );
-        await tester.scrollUntilVisible(
-          find.text('Open File Location'),
-          160,
-          scrollable: find.byType(Scrollable).first,
-        );
-        expect(find.text('Open in Steam'), findsOneWidget);
-        expect(tester.takeException(), isNull);
+      calls.clear();
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(WindowsGames.channel, (call) async {
+            calls.add(call);
+            throw PlatformException(code: 'steam_unavailable');
+          });
+      await render(
+        const SteamUpdateEvidence(
+          SteamUpdateState.available,
+          'Verified fixture.',
+        ),
+      );
+      await tester.tap(find.byType(SteamUpdateAction));
+      await tester.pump();
+      expect(c.error, contains('could not be opened'));
+      expect(c.launched, [1]);
+      expect(calls.single.method, 'openSteam');
+      expect(c.pendingLaunches, isEmpty);
+      for (final size in ProfileSize.values) {
+        c.settings = c.settings.copy(profileSize: size);
+        tester.view.physicalSize = const Size(360, 700);
+        for (final dark in [false, true]) {
+          await render(
+            const SteamUpdateEvidence(
+              SteamUpdateState.downloading,
+              'Verified fixture.',
+            ),
+            dark: dark,
+          );
+          await tester.scrollUntilVisible(
+            find.text('Open File Location'),
+            160,
+            scrollable: find.byType(Scrollable).first,
+          );
+          expect(find.text('Open in Steam'), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        }
       }
       // A local game must ignore any accidental Steam evidence.
       c.games = [

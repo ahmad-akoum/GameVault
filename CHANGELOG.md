@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.3.0 - Unreleased candidate 3
+## 2.3.0 - Unreleased candidate 4
 
 ### Added
 - Refresh Installation across configured Steam libraries, installation status, and folder/executable location actions.
@@ -8,7 +8,7 @@
 - Latest-two Recent Sessions with expand/collapse and collapsible Game Settings.
 
 ### Changed
-- Verified Steam pending states replace Play in its original profile position; completed, unknown and last-known states retain launch access. Status indicators never launch a game.
+- Verified Steam pending states replace Play in its original profile position; completed, unknown and last-known states retain launch access. Status buttons open the corresponding game in Steam without launching or controlling downloads. Update Available explicitly asks users to start the update manually in Steam.
 - Open in Steam and Open File Location are always accessible together on Steam profiles and wrap at narrow widths. Open EXE Location remains in Game Settings.
 - Restored HLTB search, retrieved completion estimates, match selection, lookup after selected imports, and refresh. Saved estimates/matches remain intact; request failures are reported explicitly.
 - Update-state refresh runs independently of activity tracking, with bounded log reads and no Steam writes.
