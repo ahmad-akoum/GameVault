@@ -82,7 +82,7 @@ void main() {
       }
 
       await render(SteamUpdateEvidence.unknown);
-      final playPosition = tester.getTopLeft(find.text('Play game'));
+      final playPosition = tester.getTopLeft(find.text('Play Game'));
       expect(find.text('Open in Steam'), findsOneWidget);
       expect(find.text('Open File Location'), findsOneWidget);
       expect(
@@ -97,8 +97,14 @@ void main() {
         SteamUpdateState.updating,
       ]) {
         await render(SteamUpdateEvidence(state, 'Verified fixture.'));
-        expect(find.text('Play game'), findsNothing);
+        expect(find.text('Play Game'), findsNothing);
         expect(find.byType(SteamUpdateAction), findsOneWidget);
+        expect(find.text('Update Available'), findsOneWidget);
+        expect(c.steamUpdates[1]!.badge, 'Update Available');
+        expect(c.steamUpdates[1]!.state, state);
+        for (final label in ['Queued', 'Paused', 'Downloading', 'Updating']) {
+          expect(find.text(label), findsNothing);
+        }
         expect(
           tester.getTopLeft(find.byType(SteamUpdateAction)).dy,
           closeTo(playPosition.dy - 12, 16),
@@ -115,7 +121,7 @@ void main() {
           find.text(
             'Opens this game in Steam. Start the update there manually.',
           ),
-          state == SteamUpdateState.available ? findsOneWidget : findsNothing,
+          findsOneWidget,
         );
         expect(find.text('Open in Steam'), findsOneWidget);
         expect(find.text('Open File Location'), findsOneWidget);
@@ -133,10 +139,10 @@ void main() {
         SteamUpdateEvidence.unknown,
       ]) {
         await render(evidence);
-        expect(find.text('Play game'), findsOneWidget);
+        expect(find.text('Play Game'), findsOneWidget);
         expect(find.byType(SteamUpdateAction), findsNothing);
       }
-      await tester.tap(find.text('Play game'));
+      await tester.tap(find.text('Play Game'));
       expect(c.launched, [1]);
       expect(calls, isEmpty);
       await tester.tap(find.text('Open in Steam'));
@@ -202,7 +208,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Play game'), findsOneWidget);
+      expect(find.text('Play Game'), findsOneWidget);
       expect(find.byType(SteamUpdateAction), findsNothing);
       expect(c.tracker.sessions, isEmpty);
       await tester.pumpWidget(const SizedBox());

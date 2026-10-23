@@ -146,3 +146,20 @@ native Steam launch dispatch. Full Flutter, native, analysis and isolated
 Windows build checks remain required. Actual Steam download transitions are
 owner acceptance tests; navigation cannot guarantee Steam's independent
 scheduler does not change state on its own.
+
+## Candidate 5 simplified terminology (Issue #19)
+
+SteamUpdateEvidence.badge and summary now collapse all pending enum values to
+Update Available. Eligibility is unchanged: pending plus current verified
+evidence; unknown, completed/no-pending and last-known states retain Play Game.
+SteamUpdateAction uses the same label and existing openSteam callback for every
+pending state. Cover badges share that mapping. Normal tooltips avoid stage
+claims; SteamUpdatePanel keeps the original state/message in an expandable
+Update diagnostics section. The classifier, evidence signature, refresh cadence,
+Steam URI, session accounting and artwork streams are untouched. Running and
+launching still disable the primary Play Game button rather than adding labels.
+
+The profile regression tests exercise every mapped state, completion/fallback,
+exact AppID navigation with no launch/download request, Play dispatch and narrow
+profile layouts. Automatic initiation investigations remain preserved under
+Issue #16 and are on hold, not a V2.3 release blocker.

@@ -60,7 +60,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Play game'), findsNothing);
+      expect(find.text('Play Game'), findsNothing);
       expect(find.byType(SteamUpdateAction), findsOneWidget);
       expect(find.text('Open in Steam'), findsOneWidget);
       expect(find.byType(SessionRow), findsNWidgets(2));
