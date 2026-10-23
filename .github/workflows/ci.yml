@@ -1,0 +1,70 @@
+name: GameVault CI
+
+on:
+  pull_request:
+    branches: [main, 'codex/**', 'feature/**', 'fix/**']
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Verification only. No write token, secrets, release, deployment or artifact upload.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  privacy:
+    name: Privacy guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - name: Test the privacy guard
+        run: python -m unittest discover -s test -p '*_test.py'
+      - name: Scan tracked files and reachable publishing history
+        run: python tool/ci_guard.py --history
+
+  windows:
+    name: Windows validation
+    needs: privacy
+    runs-on: windows-2022
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          flutter-version: '3.38.5'
+          cache: true
+      - name: Resolve locked dependencies
+        run: flutter pub get --enforce-lockfile
+      - name: Static analysis
+        run: flutter analyze --no-pub
+      - name: Complete offline Flutter suite
+        run: flutter test --no-pub --reporter expanded
+      - name: Native inactivity suites (assertions enabled)
+        shell: pwsh
+        run: ./scripts/test_native.ps1
+      - name: Windows x64 Release build verification
+        shell: pwsh
+        run: |
+          # This is a disposable hosted runner, never the owner's installation.
+          flutter config --enable-windows-desktop --build-dir .ci-build
+          if ($LASTEXITCODE -ne 0) { throw 'Flutter configuration failed' }
+          ./scripts/prepare_windows.ps1
+          flutter build windows --release --no-pub -t lib/main.dart --split-debug-info="$env:RUNNER_TEMP/gamevault-ci-symbols"
+          if ($LASTEXITCODE -ne 0) { throw 'Release build failed' }
+          foreach ($file in @('gamevault.exe', 'flutter_windows.dll', 'data/icudtl.dat', 'data/app.so')) {
+            if (-not (Test-Path -LiteralPath ".ci-build/windows/x64/runner/Release/$file")) { throw "Missing runtime: $file" }
+          }
