@@ -25,8 +25,8 @@ root. Otherwise it is retained with guidance to select a path. Metadata,
 artwork, matches, favorites, and sessions are not replaced. Launching attempts
 this refresh automatically when the saved Steam directory no longer exists.
 
-Profile settings provide Refresh Installation, Open Game Directory, and Open
-EXE Location. The native `openLocation` handler uses Windows Shell folder APIs,
+The profile provides Open File Location beside Open in Steam. Settings retain
+Refresh Installation and the separate Open EXE Location action. The native `openLocation` handler uses Windows Shell folder APIs,
 including file selection and parent-folder fallback; it does not build shell
 commands from paths. No game files or Steam configuration are written.
 
@@ -58,3 +58,23 @@ manifests, unavailable paths, Steam dispatch, and banner sizing.
 and reachable narrow settings. Existing responsive/theme/artwork and native
 input suites remain required. Real relocated Bodycam launching and Explorer
 selection still need user acceptance testing.
+
+## Candidate 3 directory action
+
+`VaultController.openGameLocation` now calls `SteamInstallation.directoryFor`
+when opening a game directory. The earlier implementation passed the saved
+path directly to Explorer, which could open an obsolete folder after a Steam
+library move even when that folder still existed. `directoryFor` reuses
+`inspect` on each click, preferring the sole manifest-verified installation in
+configured/discovered libraries. It does not persist a metadata refresh or
+modify games. Missing/ambiguous Steam evidence produces the existing friendly
+error instead of guessing an old directory.
+
+Local games use an existing absolute installation directory, then the parent
+of an existing selected executable if their saved directory is unavailable.
+The secondary Open EXE Location still selects a valid chosen executable using
+the same native handler, with verified directory fallback when it is missing.
+`installation_test.dart` covers moved libraries with a surviving old folder,
+duplicate/missing manifests, unchanged saved metadata, local fallback, file
+selection and failure without native dispatch. This reuses the established
+Windows Shell APIs and does not write game files or Steam settings.

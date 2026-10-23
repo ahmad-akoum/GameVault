@@ -6,6 +6,7 @@ import '../state/vault_controller.dart';
 import 'components.dart';
 import 'collections_page.dart';
 import 'session_presentation.dart';
+import 'steam_update_indicator.dart';
 
 enum TrackingSection { summary, progress, settings }
 
@@ -22,6 +23,7 @@ class TrackingControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = controller, g = game;
+    final update = g.isManual ? null : c.steamUpdates[g.appId];
     final unknown = hasUnknownActivity(
       c.tracker.sessions.where((s) => s.gameId == g.appId),
     );
@@ -36,20 +38,24 @@ class TrackingControls extends StatelessWidget {
             runSpacing: 12,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              FilledButton.icon(
-                onPressed:
-                    c.running(g.appId) || c.pendingLaunches.containsKey(g.appId)
-                    ? null
-                    : () => c.launch(g.appId),
-                icon: const Icon(Icons.play_arrow),
-                label: Text(
-                  c.running(g.appId)
-                      ? 'Running'
-                      : c.pendingLaunches.containsKey(g.appId)
-                      ? 'Launching…'
-                      : 'Play game',
+              if (update?.badge != null)
+                SteamUpdateAction(evidence: update!)
+              else
+                FilledButton.icon(
+                  onPressed:
+                      c.running(g.appId) ||
+                          c.pendingLaunches.containsKey(g.appId)
+                      ? null
+                      : () => c.launch(g.appId),
+                  icon: const Icon(Icons.play_arrow),
+                  label: Text(
+                    c.running(g.appId)
+                        ? 'Running'
+                        : c.pendingLaunches.containsKey(g.appId)
+                        ? 'Launching…'
+                        : 'Play game',
+                  ),
                 ),
-              ),
               Text(
                 'Total ${sessionDuration(total)}  •  Active ${unknown ? 'Unknown' : sessionDuration(active)}  •  Inactive ${unknown ? 'Unknown' : sessionDuration(total - active)}',
               ),

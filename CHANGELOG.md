@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.3.0 — Unreleased candidate 2
+## 2.3.0 - Unreleased candidate 3
 
 ### Added
 - Refresh Installation across configured Steam libraries, installation status, and folder/executable location actions.
@@ -8,10 +8,13 @@
 - Latest-two Recent Sessions with expand/collapse and collapsible Game Settings.
 
 ### Changed
+- Verified Steam pending states replace Play in its original profile position; completed, unknown and last-known states retain launch access. Status indicators never launch a game.
+- Open in Steam and Open File Location are always accessible together on Steam profiles and wrap at narrow widths. Open EXE Location remains in Game Settings.
 - Restored HLTB search, retrieved completion estimates, match selection, lookup after selected imports, and refresh. Saved estimates/matches remain intact; request failures are reported explicitly.
 - Update-state refresh runs independently of activity tracking, with bounded log reads and no Steam writes.
 
 ### Fixed
+- Open File Location resolves current Steam manifests when clicked, avoiding a surviving stale installation folder; local directories and executable-parent fallback are supported.
 - Steam launching no longer rejects a valid AppID solely because its stored installation folder is stale.
 - Narrow Expanded artwork uses a widescreen height cap, preserving desktop sizes and Crop/Fit.
 
