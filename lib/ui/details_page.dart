@@ -8,6 +8,10 @@ import 'tracking_controls.dart';
 import 'appearance_controls.dart';
 import 'artwork_viewer.dart';
 import 'artwork_manager.dart';
+import 'activity_pages.dart';
+import '../services/steam_installation.dart';
+import '../services/steam_updates.dart';
+import 'steam_update_indicator.dart';
 
 class DetailsPage extends StatefulWidget {
   const DetailsPage({
@@ -24,6 +28,48 @@ class DetailsPage extends StatefulWidget {
 }
 
 class _DetailsPageState extends State<DetailsPage> {
+  bool allSessions = false;
+  bool showCandidates = false;
+  late final TextEditingController query;
+  @override
+  void initState() {
+    super.initState();
+    query = TextEditingController(
+      text:
+          widget.controller.game(widget.id)?.hltb?.title ??
+          widget.controller.game(widget.id)?.title ??
+          '',
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        widget.controller.checkInstallation(widget.id);
+        if (widget.controller.platform != null) {
+          widget.controller.refreshSteamUpdates();
+        }
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(DetailsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.id != widget.id) {
+      allSessions = false;
+      showCandidates = false;
+      query.text =
+          widget.controller.game(widget.id)?.hltb?.title ??
+          widget.controller.game(widget.id)?.title ??
+          '';
+      widget.controller.checkInstallation(widget.id);
+    }
+  }
+
+  @override
+  void dispose() {
+    query.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = widget.controller;
@@ -76,11 +122,10 @@ class _DetailsPageState extends State<DetailsPage> {
         const SizedBox(height: 12),
         SizedBox(
           key: const ValueKey('profileArtwork'),
-          height: switch (profile) {
-            ProfileSize.compact => 180,
-            ProfileSize.comfortable => 260,
-            ProfileSize.expanded => 420,
-          },
+          height: profileArtworkHeight(
+            profile,
+            MediaQuery.sizeOf(context).width,
+          ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(6),
             child: Tooltip(
@@ -120,6 +165,100 @@ class _DetailsPageState extends State<DetailsPage> {
         ),
         SizedBox(height: gap),
         TrackingControls(controller: c, game: g),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            if (!g.isManual)
+              OutlinedButton.icon(
+                onPressed: () => c.openGameLocation(g.appId, steam: true),
+                icon: const Icon(Icons.open_in_new, size: 18),
+                label: const Text('Open in Steam'),
+              ),
+            OutlinedButton.icon(
+              onPressed: () => c.openGameLocation(g.appId),
+              icon: const Icon(Icons.folder_open, size: 18),
+              label: const Text('Open File Location'),
+            ),
+          ],
+        ),
+        SizedBox(height: gap),
+        const SectionTitle('Recent sessions'),
+        if (!c.tracker.sessions.any((s) => s.gameId == g.appId))
+          const Text(
+            'No recorded sessions yet. Keep GameVault open while playing.',
+          ),
+        ...c.tracker.sessions.reversed
+            .where((s) => s.gameId == g.appId)
+            .take(allSessions ? c.tracker.sessions.length : 2)
+            .map((s) => SessionRow(session: s, showTitle: false)),
+        if (c.tracker.sessions.where((s) => s.gameId == g.appId).length > 2)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              onPressed: () => setState(() => allSessions = !allSessions),
+              child: Text(allSessions ? 'Show less' : 'View all sessions'),
+            ),
+          ),
+        TrackingControls(
+          controller: c,
+          game: g,
+          section: TrackingSection.progress,
+        ),
+        SizedBox(height: gap),
+        ExpansionTile(
+          key: const PageStorageKey('gameSettings'),
+          tilePadding: EdgeInsets.zero,
+          title: const Text('Game Settings / Installation / Tracking'),
+          children: [
+            TrackingControls(
+              controller: c,
+              game: g,
+              section: TrackingSection.settings,
+            ),
+            Text(
+              'Installation: ${c.installations[g.appId]?.status.label ?? InstallationStatus.unknown.label}',
+            ),
+            if (c.installations[g.appId] != null)
+              Text(c.installations[g.appId]!.message),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (!g.isManual)
+                  OutlinedButton.icon(
+                    onPressed: c.refreshingInstallation.contains(g.appId)
+                        ? null
+                        : () => c.refreshInstallation(g.appId),
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Refresh Installation'),
+                  ),
+                OutlinedButton(
+                  onPressed: () =>
+                      c.openGameLocation(g.appId, executable: true),
+                  child: const Text('Open EXE Location'),
+                ),
+              ],
+            ),
+            if (!g.isManual) ...[
+              const SizedBox(height: 16),
+              const SectionTitle('Game Update Center'),
+              SteamUpdatePanel(
+                showOpen: false,
+                evidence:
+                    c.steamUpdates[g.appId] ?? SteamUpdateEvidence.unknown,
+                onOpen: () => c.openGameLocation(g.appId, steam: true),
+                onRefresh: () => c.refreshSteamUpdates(),
+              ),
+              if (c.installations[g.appId]?.buildId != null)
+                Text('Installed build: ${c.installations[g.appId]!.buildId}'),
+              if (c.installations[g.appId]?.updated != null)
+                Text(
+                  'Steam manifest LastUpdated: ${c.installations[g.appId]!.updated!.toLocal()}',
+                ),
+            ],
+          ],
+        ),
         SizedBox(height: gap),
         Wrap(
           spacing: 12,
@@ -165,14 +304,27 @@ class _DetailsPageState extends State<DetailsPage> {
         SizedBox(height: gap),
         const Divider(),
         const SizedBox(height: 28),
-        Text(
-          'HOW LONG TO BEAT',
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.7,
-            color: scheme.onSurfaceVariant,
-          ),
+        AdaptiveRow(
+          children: [
+            Expanded(
+              child: Text(
+                'HOW LONG TO BEAT',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.7,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            TextButton.icon(
+              onPressed: g.hltbState == HltbState.loading
+                  ? null
+                  : () => c.lookup(g.appId),
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text('Refresh'),
+            ),
+          ],
         ),
         const SizedBox(height: 14),
         if (g.hltb != null) ...[
@@ -199,37 +351,92 @@ class _DetailsPageState extends State<DetailsPage> {
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: AdaptiveRow(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                Icons.info_outline,
-                size: 20,
-                color: scheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Text(
-                  'Live HowLongToBeat lookup is temporarily unavailable pending an authorized integration. Saved estimates remain available.',
+        if (g.hltbState == HltbState.loading)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 18),
+            child: AdaptiveRow(
+              children: [
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 ),
-              ),
-            ],
+                const SizedBox(width: 12),
+                Text(
+                  g.hltb == null
+                      ? 'Searching HowLongToBeat…'
+                      : 'Refreshing; saved information is shown above…',
+                ),
+              ],
+            ),
           ),
-        ),
-        if (g.candidates.isNotEmpty)
-          ExpansionTile(
-            initiallyExpanded:
-                g.hltbState == HltbState.ambiguous ||
-                g.hltbState == HltbState.noMatch,
-            tilePadding: EdgeInsets.zero,
-            title: const Text('Previously saved matches'),
-            children: [
-              const Padding(
-                padding: EdgeInsets.only(bottom: 8),
-                child: Text('These saved choices are available offline.'),
+        if (g.hltbState != HltbState.matched &&
+            g.hltbState != HltbState.loading)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: AdaptiveRow(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  g.hltbState == HltbState.ambiguous
+                      ? Icons.rule
+                      : Icons.info_outline,
+                  size: 20,
+                  color: scheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    g.hltbState == HltbState.pending
+                        ? 'Search for a game below or refresh its saved match.'
+                        : '${(g.hltbMessage?.contains('temporarily unavailable pending') == true ? 'Search or refresh to check current availability.' : g.hltbMessage) ?? 'No completion information available.'}${g.hltb != null ? ' Previously saved information is shown above.' : ''}',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        const SizedBox(height: 18),
+        ExpansionTile(
+          initiallyExpanded:
+              g.hltbState == HltbState.ambiguous ||
+              g.hltbState == HltbState.noMatch,
+          tilePadding: EdgeInsets.zero,
+          title: const Text('Find or change the HowLongToBeat match'),
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16, top: 8),
+              child: AdaptiveRow(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: query,
+                      onSubmitted: g.hltbState == HltbState.loading
+                          ? null
+                          : (text) {
+                              setState(() => showCandidates = true);
+                              c.lookup(g.appId, query: text);
+                            },
+                      decoration: const InputDecoration(
+                        labelText: 'Game title on HowLongToBeat',
+                        hintText: 'Try an alternate title',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  OutlinedButton(
+                    onPressed: g.hltbState == HltbState.loading
+                        ? null
+                        : () {
+                            setState(() => showCandidates = true);
+                            c.lookup(g.appId, query: query.text);
+                          },
+                    child: const Text('Search'),
+                  ),
+                ],
               ),
+            ),
+            if (g.candidates.isNotEmpty &&
+                (showCandidates || g.candidates.isNotEmpty))
               ...g.candidates.map(
                 (e) => ListTile(
                   contentPadding: EdgeInsets.zero,
@@ -238,13 +445,16 @@ class _DetailsPageState extends State<DetailsPage> {
                     '${e.year != null && e.year! > 0 ? '${e.year} • ' : ''}${e.main > 0 ? '${e.main.toStringAsFixed(1)} hours main story' : 'Main story time unavailable'}',
                   ),
                   trailing: OutlinedButton(
-                    onPressed: () => c.selectMatch(g.appId, e),
-                    child: const Text('Use saved match'),
+                    onPressed: () {
+                      setState(() => showCandidates = false);
+                      c.selectMatch(g.appId, e);
+                    },
+                    child: const Text('Use this match'),
                   ),
                 ),
               ),
-            ],
-          ),
+          ],
+        ),
         SizedBox(height: gap),
         const Divider(),
         SizedBox(height: gap),
@@ -370,4 +580,16 @@ class _DetailsPageState extends State<DetailsPage> {
       }
     }
   }
+}
+
+/// Keep desktop sizes; constrain tall Expanded artwork in narrow Snap slots.
+double profileArtworkHeight(ProfileSize size, double width) {
+  final desired = switch (size) {
+    ProfileSize.compact => 180.0,
+    ProfileSize.comfortable => 260.0,
+    ProfileSize.expanded => 420.0,
+  };
+  return width < 700
+      ? desired.clamp(0.0, (width - 48).clamp(120.0, 650.0) * 9 / 16)
+      : desired;
 }

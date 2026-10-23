@@ -17,6 +17,14 @@ abstract class GamePlatform {
 
 class WindowsGames implements GamePlatform {
   static const channel = MethodChannel('gamevault/windows');
+  static Future<DateTime?> steamStarted() async {
+    final result = await channel.invokeMethod<int>(
+      'steamStarted',
+      <String, Object>{},
+    );
+    return result == null ? null : DateTime.fromMillisecondsSinceEpoch(result);
+  }
+
   @override
   Future<void> launch(VaultGame game) async {
     if (game.isManual) {
@@ -29,10 +37,6 @@ class WindowsGames implements GamePlatform {
           'The selected executable is missing. Choose its new location.',
         );
       }
-    } else if (!await Directory(game.installPath).exists()) {
-      throw const FileSystemException(
-        'The game installation is missing or its drive is disconnected.',
-      );
     }
     await channel.invokeMethod<void>('launch', {
       'steamId': game.isManual ? 0 : game.appId,
@@ -70,6 +74,26 @@ class WindowsGames implements GamePlatform {
       }
     }
     return WindowsSample(observations, result['idleSeconds'] as int);
+  }
+
+  static Future<void> openLocation(String path, {bool select = false}) async {
+    if (!p.isAbsolute(path) ||
+        !(select
+            ? await File(path).exists()
+            : await Directory(path).exists())) {
+      throw const FileSystemException(
+        'The location is missing or unavailable.',
+      );
+    }
+    await channel.invokeMethod<void>('openLocation', {
+      'path': path,
+      'select': select,
+    });
+  }
+
+  static Future<void> openSteam(int appId) async {
+    if (appId <= 0) return;
+    await channel.invokeMethod<void>('openSteam', {'steamId': appId});
   }
 
   static Future<void> openWeb(String url) async {

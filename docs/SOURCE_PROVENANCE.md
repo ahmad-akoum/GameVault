@@ -29,3 +29,12 @@ Final V2.0 source: `32583123ec2b0e9dc1206d56a62ac64a76c87820`, including the shu
 V2.1 source exported from original commit `0d03964e1fa56f1076ed1e1f1ee682e35ba4d41c`. Application source and locked dependency versions match; only public documentation/ignore rules differ. Both final versions include the separate shutdown fix.
 
 Final local V2.1 documentation/tag checkpoint: `f0b3356d7026b55448a768c7703a576c6437bda7`. Runtime source is identical to the implementation checkpoint above.
+
+## Unapproved V2.3 candidate 2 source review
+
+The candidate (2.3.0+10) was implemented and built before the Issue/PR workflow
+was introduced. It is now imported as one honestly dated source checkpoint from
+the active development project. No original private history or personal data is
+pushed, no earlier feature commits are invented, and the existing public history
+is retained. The source PR remains draft pending owner acceptance. Workflow
+setup is a separate PR; neither PR publishes a release or upgrades stable.

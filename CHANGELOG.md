@@ -1,5 +1,30 @@
 # Changelog
 
+## 2.3.0
+
+### Added
+- Refresh Installation across configured Steam libraries, installation status, and folder/executable location actions.
+- Read-only Steam update-state detection and top-left cover badges with amber profile status and Open in Steam. Ambiguous states remain Unknown.
+- Latest-two Recent Sessions with expand/collapse and collapsible Game Settings.
+
+### Changed
+- All verified pending Steam update stages use one Update Available action/badge; Play Game remains the safe fallback. Detailed evidence is expandable diagnostics, not a download-stage claim. Update buttons only open Steam.
+- Automatic update initiation research is on hold and is not a V2.3 release blocker.
+- Verified Steam pending states replace Play in its original profile position; completed, unknown and last-known states retain launch access. Status buttons open the corresponding game in Steam without launching or controlling downloads. Update Available explicitly asks users to start the update manually in Steam.
+- Open in Steam and Open File Location are always accessible together on Steam profiles and wrap at narrow widths. Open EXE Location remains in Game Settings.
+- Restored HLTB search, retrieved completion estimates, match selection, lookup after selected imports, and refresh. Saved estimates/matches remain intact; request failures are reported explicitly.
+- Update-state refresh runs independently of activity tracking, with bounded log reads and no Steam writes.
+
+### Fixed
+- Open File Location resolves current Steam manifests when clicked, avoiding a surviving stale installation folder; local directories and executable-parent fallback are supported.
+- Steam launching no longer rejects a valid AppID solely because its stored installation folder is stale.
+- Narrow Expanded artwork uses a widescreen height cap, preserving desktop sizes and Crop/Fit.
+
+### Known limitations
+- HLTB live requests and isolated persistence tests pass, but its unofficial protocol and unresolved distribution permissions remain limitations. No access-control bypass is introduced.
+- Steam state is saved local evidence, not a supported real-time client-button API. Unknown/closed/stale states never fabricate live badges or claim a game is fully up to date.
+- Real relocated-game launches, Explorer actions and download transitions await manual acceptance. No stable upgrade or publication is authorized.
+
 ## 2.2.0
 
 ### Added

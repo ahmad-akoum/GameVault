@@ -253,23 +253,6 @@ void main() {
     );
   });
   group('HLTB availability and matching', () {
-    test(
-      'public provider is disabled pending an authorized integration',
-      () async {
-        await expectLater(
-          const DisabledHltbProvider().search('Game'),
-          throwsA(
-            isA<HltbFailure>()
-                .having((e) => e.state, 'state', HltbState.unavailable)
-                .having(
-                  (e) => e.message,
-                  'message',
-                  contains('authorized integration'),
-                ),
-          ),
-        );
-      },
-    );
     test('unique normalized match or AppID; ambiguity requires choice', () {
       const one = HltbEntry(id: 1, title: 'ELDEN RING™');
       const two = HltbEntry(id: 2, title: 'Elden Ring');
@@ -332,8 +315,8 @@ void main() {
         await c.importGames({1});
         expect(c.games.length, 1);
         expect(c.games.single.appId, 1);
-        expect(c.games.single.hltbState, HltbState.pending);
-        expect(h.searchedTitles, isEmpty);
+        expect(c.games.single.hltbState, HltbState.noMatch);
+        expect(h.searchedTitles, ['One']);
       },
     );
     test(
@@ -365,7 +348,7 @@ void main() {
           HltbEntry(id: 2, title: 'Second', main: 20),
         ];
         await c.importGames({1});
-        expect(h.searchedTitles, isEmpty);
+        expect(h.searchedTitles, ['One']);
         await c.lookup(1);
         expect(c.game(1)!.hltbState, HltbState.ambiguous);
         await c.selectMatch(1, h.results.last);

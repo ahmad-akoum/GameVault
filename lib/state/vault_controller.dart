@@ -5,6 +5,8 @@ import 'package:path/path.dart' as p;
 import '../models/game.dart';
 import '../services/local_store.dart';
 import '../services/steam_scanner.dart';
+import '../services/steam_installation.dart';
+import '../services/steam_updates.dart';
 import '../services/hltb_provider.dart';
 import '../services/metadata_provider.dart';
 import '../services/windows_games.dart';
@@ -26,6 +28,45 @@ class VaultController extends ChangeNotifier {
   final SessionTracker tracker = SessionTracker();
   final Stopwatch _clock = Stopwatch();
   Timer? _monitor;
+  Timer? _updateMonitor;
+  Future<void>? _updatePoll;
+  late final SteamUpdateService updateService = SteamUpdateService(
+    scanner,
+    steamStarted: WindowsGames.steamStarted,
+  );
+  Map<int, SteamUpdateEvidence> steamUpdates = {};
+
+  Future<void> refreshSteamUpdates() {
+    if (_closing || storageBlocked) return Future.value();
+    return _updatePoll ??= _refreshSteamUpdates().whenComplete(
+      () => _updatePoll = null,
+    );
+  }
+
+  Future<void> _refreshSteamUpdates() async {
+    Map<int, SteamUpdateEvidence> next;
+    try {
+      next = await updateService.refresh(
+        List.of(games),
+        List.of(settings.paths),
+      );
+    } catch (_) {
+      next = {
+        for (final g in games.where((g) => !g.isManual))
+          g.appId: SteamUpdateEvidence.unknown,
+      };
+    }
+    if (_closing) return;
+    next.removeWhere((id, _) => game(id) == null);
+    final changed =
+        steamUpdates.length != next.length ||
+        next.entries.any(
+          (e) => steamUpdates[e.key]?.signature != e.value.signature,
+        );
+    steamUpdates = next;
+    if (changed) notifyListeners();
+  }
+
   Future<void>? _poll;
   bool _closing = false;
   int _lastCheckpoint = 0;
@@ -43,6 +84,115 @@ class VaultController extends ChangeNotifier {
   String? error, fatalError;
   String activity = '';
   final Set<int> busy = {};
+  final Map<int, InstallationEvidence> installations = {};
+  final Set<int> refreshingInstallation = {};
+
+  Future<void> checkInstallation(int id) async {
+    final g = game(id);
+    if (g == null || _closing) return;
+    try {
+      final evidence = await SteamInstallation(
+        scanner,
+      ).inspect(g, settings.paths);
+      if (_closing) return;
+      installations[id] = evidence;
+      notifyListeners();
+    } catch (_) {
+      /* Inconclusive evidence stays Unknown. */
+    }
+  }
+
+  Future<void> refreshInstallation(int id, {bool feedback = true}) async {
+    final original = game(id);
+    if (original == null || !refreshingInstallation.add(id)) return;
+    notifyListeners();
+    try {
+      final evidence = await SteamInstallation(
+        scanner,
+      ).inspect(original, settings.paths);
+      installations[id] = evidence;
+      if (evidence.installPath != null) {
+        String? relocatedExecutable;
+        final oldExecutable = original.executablePath;
+        if (oldExecutable != null &&
+            !await File(oldExecutable).exists() &&
+            p.isWithin(original.installPath, oldExecutable)) {
+          final candidate = p.join(
+            evidence.installPath!,
+            p.relative(oldExecutable, from: original.installPath),
+          );
+          if (await File(candidate).exists()) relocatedExecutable = candidate;
+        }
+        await update(id, (current) {
+          // Retain valid overrides, including executables outside the game root.
+          // Repair a missing override only at the identical relative game path.
+          return current.copy(
+            installPath: evidence.installPath,
+            libraryPath: evidence.libraryPath,
+            executablePath: current.executablePath == oldExecutable
+                ? relocatedExecutable
+                : null,
+          );
+        });
+        if (game(id)?.installPath != evidence.installPath) return;
+        installations[id] = InstallationEvidence(
+          InstallationStatus.installed,
+          evidence.message,
+          installPath: evidence.installPath,
+          libraryPath: evidence.libraryPath,
+          buildId: evidence.buildId,
+          updated: evidence.updated,
+        );
+      }
+      if (feedback) {
+        error = evidence.installPath != null
+            ? 'Installation refreshed. Tracking executable selection preserved.'
+            : evidence.message;
+        final selected = game(id)?.executablePath;
+        if (selected != null && !await File(selected).exists()) {
+          error =
+              '${error ?? ''} The selected tracking executable is unavailable; choose its current location or use automatic detection.';
+        }
+      }
+    } catch (_) {
+      if (feedback) {
+        error =
+            'Installation could not be verified. Check that the library drive is connected.';
+      }
+    } finally {
+      refreshingInstallation.remove(id);
+      if (platform != null && !_closing) unawaited(refreshSteamUpdates());
+      notifyListeners();
+    }
+  }
+
+  Future<void> openGameLocation(
+    int id, {
+    bool executable = false,
+    bool steam = false,
+  }) async {
+    final g = game(id);
+    if (g == null) return;
+    try {
+      if (steam) {
+        await WindowsGames.openSteam(g.appId);
+      } else if (executable &&
+          g.executablePath != null &&
+          await File(g.executablePath!).exists()) {
+        await WindowsGames.openLocation(g.executablePath!, select: true);
+      } else {
+        final directory = await SteamInstallation(
+          scanner,
+        ).directoryFor(g, settings.paths);
+        await WindowsGames.openLocation(directory);
+      }
+    } catch (_) {
+      error =
+          'The location could not be opened. Refresh the installation or choose an available executable.';
+      notifyListeners();
+    }
+  }
+
   Future<void> _lookupTail = Future.value();
   VaultGame? game(int id) => games.where((g) => g.appId == id).firstOrNull;
   Future<void> initialize() async {
@@ -68,6 +218,11 @@ class VaultController extends ChangeNotifier {
     if (!storageBlocked && platform != null) {
       _clock.start();
       _monitor = Timer.periodic(const Duration(seconds: 2), (_) => pollGames());
+      unawaited(refreshSteamUpdates());
+      _updateMonitor = Timer.periodic(
+        const Duration(seconds: 30),
+        (_) => refreshSteamUpdates(),
+      );
     }
     notifyListeners();
   }
@@ -183,6 +338,7 @@ class VaultController extends ChangeNotifier {
             metadataMessage: enriched.metadataMessage,
           ),
         );
+        await lookup(d.appId);
       } catch (e) {
         stderr.writeln('Import enrichment: $e');
       }
@@ -191,6 +347,7 @@ class VaultController extends ChangeNotifier {
     }
     importing = false;
     activity = '';
+    if (platform != null && !_closing) unawaited(refreshSteamUpdates());
     notifyListeners();
   }
 
@@ -282,7 +439,10 @@ class VaultController extends ChangeNotifier {
     pendingLaunches[id] = _clock.elapsed.inSeconds + 120;
     notifyListeners();
     try {
-      await platform!.launch(g);
+      if (!g.isManual && !await Directory(g.installPath).exists()) {
+        await refreshInstallation(id, feedback: false);
+      }
+      await platform!.launch(game(id) ?? g);
       if (!settings.trackingEnabled) {
         pendingLaunches.remove(id);
         notifyListeners();
@@ -449,9 +609,16 @@ class VaultController extends ChangeNotifier {
     try {
       final results = HltbMatcher.rank(
         original.title,
-        await hltb.search(query ?? original.title),
+        await hltb.search(query ?? original.hltb?.title ?? original.title),
       );
-      final match = HltbMatcher.confidentMatch(original.title, id, results);
+      final savedMatch = query == null && original.hltb != null
+          ? results.where((e) => e.id == original.hltb!.id).firstOrNull
+          : null;
+      final match =
+          savedMatch ??
+          (query == null && original.hltb != null
+              ? null
+              : HltbMatcher.confidentMatch(original.title, id, results));
       await update(
         id,
         (g) => g.copy(
@@ -505,6 +672,8 @@ class VaultController extends ChangeNotifier {
   Future<void> shutdown() async {
     _closing = true;
     _monitor?.cancel();
+    _updateMonitor?.cancel();
+    await _updatePoll;
     await _poll;
     await _mutate(() async {
       final hasOpen = tracker.sessions.any((s) => s.open);
