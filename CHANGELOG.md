@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.3.0 - Unreleased candidate 5
+## 2.3.0
 
 ### Added
 - Refresh Installation across configured Steam libraries, installation status, and folder/executable location actions.
