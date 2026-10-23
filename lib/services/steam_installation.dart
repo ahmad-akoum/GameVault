@@ -34,6 +34,29 @@ class SteamInstallation {
   SteamInstallation(this.scanner);
   final SteamScanner scanner;
 
+  /// Resolve on demand: a surviving old folder is not proof of installation.
+  /// Reuse AppID/library validation rather than guessing paths or writing metadata.
+  Future<String> directoryFor(VaultGame game, List<String> roots) async {
+    if (game.isManual) {
+      if (p.isAbsolute(game.installPath) &&
+          await Directory(game.installPath).exists()) {
+        return game.installPath;
+      }
+      final executable = game.executablePath;
+      if (executable != null &&
+          p.isAbsolute(executable) &&
+          await File(executable).exists()) {
+        return p.dirname(executable);
+      }
+    } else {
+      final evidence = await inspect(game, roots);
+      if (evidence.installPath != null) return evidence.installPath!;
+    }
+    throw const FileSystemException(
+      'The installation directory could not be verified. Check its library drive.',
+    );
+  }
+
   Future<InstallationEvidence> inspect(
     VaultGame game,
     List<String> roots,

@@ -177,6 +177,106 @@ void main() {
     },
   );
   test(
+    'file location verifies moved Steam root even if stale folder survives, without saving',
+    () async {
+      final old = p.join(temp.path, 'OldDrive');
+      final actual = p.join(temp.path, 'OtherDrive');
+      await Directory(game(old).installPath).create(recursive: true);
+      await installed(actual);
+      final scanner = SteamScanner(
+        installationRoots: () async => [old, actual],
+      );
+      final c = VaultController(
+        store: LocalStore(Directory(p.join(temp.path, 'vault'))),
+        scanner: scanner,
+        metadata: TestMetadata(),
+        hltb: TestHltb(),
+      );
+      await c.initialize();
+      c.games = [game(old)];
+      final calls = <MethodCall>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(WindowsGames.channel, (call) async {
+            calls.add(call);
+            return null;
+          });
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(WindowsGames.channel, null),
+      );
+      await c.openGameLocation(1);
+      expect(calls.single.method, 'openLocation');
+      expect(calls.single.arguments, {
+        'path': game(actual).installPath,
+        'select': false,
+      });
+      expect(c.games.single.installPath, game(old).installPath);
+      expect(await c.store.file.exists(), false);
+      // A duplicate is inconclusive; never open either directory by guessing.
+      calls.clear();
+      await installed(old);
+      await c.openGameLocation(1);
+      expect(calls, isEmpty);
+      expect(c.error, contains('could not be opened'));
+      await File(p.join(old, 'steamapps', 'appmanifest_1.acf')).delete();
+      await File(p.join(actual, 'steamapps', 'appmanifest_1.acf')).delete();
+      await c.openGameLocation(1);
+      expect(calls, isEmpty);
+      await c.shutdown();
+      c.dispose();
+    },
+  );
+  test(
+    'local directories and EXE selection use existing native opening and handle missing paths',
+    () async {
+      final exe = await File(
+        p.join(temp.path, 'local.exe'),
+      ).writeAsString('fixture');
+      final c = VaultController(
+        store: LocalStore(Directory(p.join(temp.path, 'vault'))),
+        scanner: SteamScanner(installationRoots: () async => []),
+        metadata: TestMetadata(),
+        hltb: TestHltb(),
+      );
+      await c.initialize();
+      c.games = [
+        VaultGame(
+          appId: -1,
+          title: 'Local',
+          installPath: temp.path,
+          libraryPath: '',
+          executablePath: exe.path,
+        ),
+      ];
+      final calls = <MethodCall>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(WindowsGames.channel, (call) async {
+            calls.add(call);
+            return null;
+          });
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(WindowsGames.channel, null),
+      );
+      await c.openGameLocation(-1);
+      expect(calls.last.arguments, {'path': temp.path, 'select': false});
+      await c.openGameLocation(-1, executable: true);
+      expect(calls.last.arguments, {'path': exe.path, 'select': true});
+      c.games = [
+        c.games.single.copy(installPath: p.join(temp.path, 'missing')),
+      ];
+      await c.openGameLocation(-1);
+      expect(calls.last.arguments, {'path': temp.path, 'select': false});
+      await exe.delete();
+      calls.clear();
+      await c.openGameLocation(-1);
+      expect(calls, isEmpty);
+      expect(c.error, contains('could not be opened'));
+      await c.shutdown();
+      c.dispose();
+    },
+  );
+  test(
     'narrow Expanded uses widescreen cap while desktop sizes remain unchanged',
     () {
       for (final size in ProfileSize.values) {

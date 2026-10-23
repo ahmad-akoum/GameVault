@@ -60,8 +60,8 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Play game'), findsOneWidget);
-      expect(find.byType(SteamUpdateSummary), findsOneWidget);
+      expect(find.text('Play game'), findsNothing);
+      expect(find.byType(SteamUpdateAction), findsOneWidget);
       expect(find.text('Open in Steam'), findsOneWidget);
       expect(find.byType(SessionRow), findsNWidgets(2));
       await tester.tap(find.text('View all sessions'));

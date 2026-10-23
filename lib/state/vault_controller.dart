@@ -181,7 +181,10 @@ class VaultController extends ChangeNotifier {
           await File(g.executablePath!).exists()) {
         await WindowsGames.openLocation(g.executablePath!, select: true);
       } else {
-        await WindowsGames.openLocation(g.installPath);
+        final directory = await SteamInstallation(
+          scanner,
+        ).directoryFor(g, settings.paths);
+        await WindowsGames.openLocation(directory);
       }
     } catch (_) {
       error =

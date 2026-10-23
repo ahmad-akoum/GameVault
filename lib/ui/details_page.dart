@@ -165,11 +165,23 @@ class _DetailsPageState extends State<DetailsPage> {
         ),
         SizedBox(height: gap),
         TrackingControls(controller: c, game: g),
-        if (c.steamUpdates[g.appId]?.badge != null)
-          SteamUpdateSummary(
-            evidence: c.steamUpdates[g.appId]!,
-            onOpen: () => c.openGameLocation(g.appId, steam: true),
-          ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            if (!g.isManual)
+              OutlinedButton.icon(
+                onPressed: () => c.openGameLocation(g.appId, steam: true),
+                icon: const Icon(Icons.open_in_new, size: 18),
+                label: const Text('Open in Steam'),
+              ),
+            OutlinedButton.icon(
+              onPressed: () => c.openGameLocation(g.appId),
+              icon: const Icon(Icons.folder_open, size: 18),
+              label: const Text('Open File Location'),
+            ),
+          ],
+        ),
         SizedBox(height: gap),
         const SectionTitle('Recent sessions'),
         if (!c.tracker.sessions.any((s) => s.gameId == g.appId))
@@ -222,10 +234,6 @@ class _DetailsPageState extends State<DetailsPage> {
                     label: const Text('Refresh Installation'),
                   ),
                 OutlinedButton(
-                  onPressed: () => c.openGameLocation(g.appId),
-                  child: const Text('Open Game Directory'),
-                ),
-                OutlinedButton(
                   onPressed: () =>
                       c.openGameLocation(g.appId, executable: true),
                   child: const Text('Open EXE Location'),
@@ -236,6 +244,7 @@ class _DetailsPageState extends State<DetailsPage> {
               const SizedBox(height: 16),
               const SectionTitle('Game Update Center'),
               SteamUpdatePanel(
+                showOpen: false,
                 evidence:
                     c.steamUpdates[g.appId] ?? SteamUpdateEvidence.unknown,
                 onOpen: () => c.openGameLocation(g.appId, steam: true),
