@@ -42,7 +42,7 @@ Future<void> main() async {
     store: store,
     scanner: SteamScanner(),
     metadata: SteamMetadataProvider(store.artwork),
-    hltb: const DisabledHltbProvider(),
+    hltb: WebsiteHltbProvider(),
     platform: WindowsGames(),
   );
   runApp(GameVaultApp(controller: controller));

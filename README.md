@@ -8,14 +8,19 @@ A local-first Flutter Windows game library: discover installed games, choose wha
 
 **V2.2.0 - Session, artwork and responsive-layout update.**
 
+This working tree contains the unpublished **V2.3.0 candidate 2 (2.3.0+10)**.
+The features below describe this candidate; the approved stable release remains
+V2.2.0. Candidate testing does not upgrade the owner's stable installation.
+
 ## Supported platform
 Windows x64 desktop. Flutter 3.38.5, Dart 3.10.4 and Visual Studio 2022 with Desktop development with C++ were used for validation. Android is not a supported GameVault release; prior Android build success does not establish working desktop integrations on a phone.
 
 ## Implemented features
 - Steam discovery across libraries and drives, manifest validation and non-game filtering, including Wallpaper Engine. Detection never automatically imports games.
-- Cached artwork, metadata, locally saved HowLongToBeat estimates and saved-match selection. Live HowLongToBeat lookup is temporarily unavailable pending an authorized integration.
+- Cached artwork and metadata, HowLongToBeat search, saved-match selection and refresh (independent website integration; availability and distribution permissions are not guaranteed).
 - Search, sorting, favorites, statuses, named collections and manual completion progress.
 - Steam/local executable launching and conservative process matching.
+- Installation refresh and folder actions across configured Steam libraries; conservative update-state badges and Open in Steam, with source/timestamp details and no automatic update downloads.
 - Independent vertical cover and widescreen profile-banner selection, local image import, preview, restore and supported Steam alternatives.
 - Total observed session time and activity-adjusted time; configurable 60-second idle and 10-second focus-loss defaults, session history and dashboard statistics.
 - Keyboard/mouse and existing XInput activity; standard DualSense Raw Input observation with drift/noise thresholds. Owner gameplay acceptance covered DualSense Bluetooth with Steam Input both enabled and disabled.

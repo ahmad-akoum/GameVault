@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.3.0 — Unreleased candidate 2
+
+### Added
+- Refresh Installation across configured Steam libraries, installation status, and folder/executable location actions.
+- Read-only Steam update-state detection and top-left cover badges with amber profile status and Open in Steam. Ambiguous states remain Unknown.
+- Latest-two Recent Sessions with expand/collapse and collapsible Game Settings.
+
+### Changed
+- Restored HLTB search, retrieved completion estimates, match selection, lookup after selected imports, and refresh. Saved estimates/matches remain intact; request failures are reported explicitly.
+- Update-state refresh runs independently of activity tracking, with bounded log reads and no Steam writes.
+
+### Fixed
+- Steam launching no longer rejects a valid AppID solely because its stored installation folder is stale.
+- Narrow Expanded artwork uses a widescreen height cap, preserving desktop sizes and Crop/Fit.
+
+### Known limitations
+- HLTB live requests and isolated persistence tests pass, but its unofficial protocol and unresolved distribution permissions remain limitations. No access-control bypass is introduced.
+- Steam state is saved local evidence, not a supported real-time client-button API. Unknown/closed/stale states never fabricate live badges or claim a game is fully up to date.
+- Real relocated-game launches, Explorer actions and download transitions await manual acceptance. No stable upgrade or publication is authorized.
+
 ## 2.2.0
 
 ### Added

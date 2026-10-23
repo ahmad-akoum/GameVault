@@ -163,6 +163,8 @@ class VaultGame {
   );
   VaultGame copy({
     String? title,
+    String? installPath,
+    String? libraryPath,
     GameStatus? status,
     bool? favorite,
     String? coverPath,
@@ -189,8 +191,8 @@ class VaultGame {
   }) => VaultGame(
     appId: appId,
     title: title ?? this.title,
-    installPath: installPath,
-    libraryPath: libraryPath,
+    installPath: installPath ?? this.installPath,
+    libraryPath: libraryPath ?? this.libraryPath,
     addedAt: addedAt,
     status: status ?? this.status,
     favorite: favorite ?? this.favorite,

@@ -1,37 +1,44 @@
-# Temporarily paused HowLongToBeat lookup
+# HowLongToBeat: V2.2 pause and V2.3 restoration
 
-## What users see
+V2.2 disabled the provider, automatic lookup on import, profile search/refresh,
+and live result controls for public distribution while integration rights were
+unresolved. It preserved estimates, candidates and match identities.
 
-V2.2.0 keeps every locally saved HowLongToBeat estimate and saved match in the
-vault and displays them on the game profile. New live searches and refreshes are
-temporarily unavailable pending an authorized integration.
+V2.3 restores `WebsiteHltbProvider`, startup wiring, automatic lookup after an
+explicit game import, profile search, manual match selection and refresh. Saved
+estimates stay visible during requests and survive failures. A refresh uses the
+saved match title and prefers its exact HLTB ID; it does not silently switch
+editions because the local title differs. The old fixed warning is replaced by
+actual request status and errors; legacy saved warning text is not displayed as
+a current restriction. No database schema or existing estimate is reset.
 
-## How it works
+`hltb_provider.dart` reuses the pre-V2.2 initialization, search payload, normal
+website-issued token, response parsing and matcher. It uses an identifying
+GameVault user agent. It does not inspect scripts, discover alternate endpoints
+on denial, impersonate accounts, solve challenges or use proxies. HTTP 401/403
+stops the request; 429 produces a cooldown. Timeouts, malformed responses and
+network errors are failures, never invented empty-success results. Tokens and
+response bodies are not logged.
 
-`main.dart` supplies `DisabledHltbProvider` to `VaultController`. That provider
-returns an unavailable result immediately and has no HTTP client, website
-endpoint, or script-inspection code. `VaultController.importGames` no longer
-starts an HLTB lookup after Steam metadata enrichment. The profile in
-`ui/details_page.dart` shows a clear notice and renders saved estimates and saved
-candidate matches from the existing `VaultGame` fields. Selecting a candidate
-already stored in the vault is a local operation.
+## Verification on 2026-10-23
 
-The model, JSON field names and migration behavior in `models/game.dart` remain
-unchanged, so existing personal vault values are preserved. Metadata refreshes
-copy the current game record and do not clear HLTB values.
+The earlier standalone initialization probe returned 403. It did not reproduce
+the original request contract (including the timestamped initialization URL,
+Origin and Referer headers), so it was insufficient evidence that restoration
+was impossible. The restored adapter returned HTTP 200 for initialization and
+search with its normal token flow. No script inspection or access workaround
+was needed. We cannot infer the server's precise rule from the earlier probe.
 
-## Why
+`tool/hltb_live_check.dart` records only endpoint paths, status, safe response
+metadata and retrieved public game entries. `hltb_live_roundtrip_test.dart`
+passed actual search, manual selection, refreshed retrieval and persisted
+match/estimate checks in a temporary vault. It runs only with the explicit
+`GAMEVAULT_LIVE_HLTB=true` define. The normal suite uses mocked HTTP responses,
+including denial, rate limits, malformed data and offline behavior.
 
-The earlier provider relied on undocumented website endpoints and inspected
-website scripts to discover endpoint changes. No authorized integration was
-established. Removing the network adapter from the application and disabling
-the profile controls prevents new automated retrieval. This limited change does
-not claim to settle every licensing question about previously retrieved data.
-
-## Verification
-
-`test/services_test.dart` checks that the public provider fails closed and that
-game import makes no HLTB request. `test/v2_widgets_test.dart` checks that saved
-estimates and saved matches remain visible, the paused status is clear, and
-search/refresh controls are absent. Existing vault round-trip tests continue to
-cover saved HLTB fields.
+These successful requests establish technical functionality, not permission,
+licensing, endorsement, availability guarantees or public-distribution clearance.
+The previous rights concern remains unresolved. This task authorizes a local
+candidate only; publication requires the owner's separate release decision and
+the project's distribution checks. The independent HLTB provider remains a
+boundary if an authorized integration is required later.

@@ -2,6 +2,7 @@
 #include "dualsense_activity.h"
 #include <windows.h>
 #include <shellapi.h>
+#include <shlobj.h>
 #include <tlhelp32.h>
 #include <xinput.h>
 #include <algorithm>
@@ -149,17 +150,55 @@ GamePlatform::GamePlatform(flutter::BinaryMessenger* messenger, HWND window) : w
     try {
       if (call.method_name() == "appVersion") {
         result->Success(V(FLUTTER_VERSION));
+      } else if (call.method_name() == "steamStarted") {
+        HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if (snapshot == INVALID_HANDLE_VALUE) { result->Error("process_unavailable", "Steam status unavailable"); return; }
+        PROCESSENTRY32 entry{}; entry.dwSize = sizeof(entry);
+        int64_t started = 0;
+        if (Process32First(snapshot, &entry)) do {
+          if (_wcsicmp(entry.szExeFile, L"steam.exe") != 0) continue;
+          HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, entry.th32ProcessID);
+          if (!process) continue;
+          FILETIME created{}, exited{}, kernel{}, user{};
+          if (GetProcessTimes(process, &created, &exited, &kernel, &user)) {
+            ULARGE_INTEGER ticks{}; ticks.LowPart = created.dwLowDateTime; ticks.HighPart = created.dwHighDateTime;
+            const int64_t time = static_cast<int64_t>(ticks.QuadPart / 10000) - 11644473600000LL;
+            if (!started || time < started) started = time;
+          }
+          CloseHandle(process);
+        } while (Process32Next(snapshot, &entry));
+        CloseHandle(snapshot);
+        if (started) result->Success(V(started)); else result->Success();
       } else if (call.method_name() == "sample") {
         const auto* value = Field(*args,"games"); const auto* games = value ? std::get_if<L>(value) : nullptr;
         if (!games) { result->Error("invalid_arguments","Missing game list"); return; }
         result->Success(V(M{{V("games"),V(Snapshot(*games))},{V("idleSeconds"),V(IdleSeconds())}}));
-      } else if (call.method_name() == "launch" || call.method_name() == "openWeb") {
+      } else if (call.method_name() == "openLocation") {
+        const auto path = Wide(Text(*args,"path"));
+        if (path.size() < 3 || GetFileAttributes(path.c_str()) == INVALID_FILE_ATTRIBUTES) {
+          result->Error("missing_location", "Location is unavailable"); return;
+        }
+        const auto* selected = Field(*args, "select");
+        const bool select = selected && std::holds_alternative<bool>(*selected) && std::get<bool>(*selected);
+        // Shell API accepts a file selection without constructing shell commands.
+        PIDLIST_ABSOLUTE item = nullptr;
+        const HRESULT parsed = SHParseDisplayName(path.c_str(), nullptr, &item, 0, nullptr);
+        if (FAILED(parsed)) { result->Error("location_failed", "Location could not be resolved"); return; }
+        HRESULT opened = select ? SHOpenFolderAndSelectItems(item, 0, nullptr, 0) : E_FAIL;
+        CoTaskMemFree(item);
+        if (!select || FAILED(opened)) {
+          const auto folder = select ? path.substr(0, path.find_last_of(L"\\/")) : path;
+          const auto status = reinterpret_cast<INT_PTR>(ShellExecute(nullptr, L"open", folder.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
+          if (status <= 32) { result->Error("location_failed", "Folder could not be opened"); return; }
+        }
+        result->Success();
+      } else if (call.method_name() == "launch" || call.method_name() == "openWeb" || call.method_name() == "openSteam") {
         std::wstring target, directory;
         if (call.method_name() == "openWeb") {
           target = Wide(Text(*args,"url"));
           if (target.rfind(L"https://",0) != 0) { result->Error("invalid_url","HTTPS required"); return; }
         } else if (Number(*args,"steamId") > 0) {
-          target = L"steam://rungameid/" + std::to_wstring(Number(*args,"steamId"));
+          target = (call.method_name() == "openSteam" ? L"steam://nav/games/details/" : L"steam://rungameid/") + std::to_wstring(Number(*args,"steamId"));
         } else {
           target = Wide(Text(*args,"executable"));
           auto normalized = Normalize(target);

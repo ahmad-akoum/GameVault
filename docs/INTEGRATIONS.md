@@ -75,3 +75,12 @@ data. No new ratings or achievements provider was added.
 
 GameVault never injects into game processes, hooks input, records key/button
 contents, requests elevation, bypasses protected processes or changes Steam files.
+
+## V2.3 candidate integration update — 2026-10-23
+
+The earlier V2.2 offline-only HLTB decision above is historical. The local V2.3
+candidate restores the normal pre-V2.2 init/search token flow and live UI;
+HTTP 200 and isolated selection/refresh/persistence tests passed. This does not
+clear the outstanding public-distribution rights question. See
+`features/hltb_public_distribution.md` and `features/steam_updates.md` for current
+technical behavior and remaining limitations. No release has been approved.

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../models/game.dart';
 import 'artwork_image.dart';
 import 'responsive.dart';
+import '../services/steam_updates.dart';
+import 'steam_update_indicator.dart';
 
 class GameArtwork extends StatelessWidget {
   const GameArtwork({
@@ -224,8 +226,10 @@ class GameTile extends StatefulWidget {
     required this.game,
     required this.onOpen,
     required this.onFavorite,
+    this.update = SteamUpdateEvidence.unknown,
   });
   final VaultGame game;
+  final SteamUpdateEvidence update;
   final VoidCallback onOpen, onFavorite;
   @override
   State<GameTile> createState() => _GameTileState();
@@ -298,6 +302,16 @@ class _GameTileState extends State<GameTile> {
                       ),
                     ),
                   ),
+                if (widget.update.badge != null)
+                  Positioned(
+                    top: 7,
+                    left: 7,
+                    right: 45,
+                    child: Align(
+                      alignment: Alignment.topLeft,
+                      child: SteamUpdateBadge(evidence: widget.update),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -350,8 +364,10 @@ class VaultGrid extends StatelessWidget {
     required this.onOpen,
     required this.onFavorite,
     this.shrinkWrap = false,
+    this.updates = const {},
   });
   final List<VaultGame> games;
+  final Map<int, SteamUpdateEvidence> updates;
   final ValueChanged<VaultGame> onOpen, onFavorite;
   final bool shrinkWrap;
   @override
@@ -373,6 +389,7 @@ class VaultGrid extends StatelessWidget {
         itemCount: games.length,
         itemBuilder: (_, i) => GameTile(
           game: games[i],
+          update: updates[games[i].appId] ?? SteamUpdateEvidence.unknown,
           onOpen: () => onOpen(games[i]),
           onFavorite: () => onFavorite(games[i]),
         ),
