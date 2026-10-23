@@ -40,16 +40,10 @@ class SteamUpdateEvidence {
     SteamUpdateState.downloading,
     SteamUpdateState.updating,
   ].contains(state);
-  String? get badge => !lastKnown && pending
-      ? (state == SteamUpdateState.available
-            ? state.label
-            : state == SteamUpdateState.queued
-            ? 'Update queued'
-            : state == SteamUpdateState.paused
-            ? 'Update paused'
-            : state.label)
-      : null;
-  String get summary => '${lastKnown ? 'Last known: ' : ''}${state.label}';
+  // Presentation only; detailed evidence remains available for diagnosis.
+  String? get badge => !lastKnown && pending ? 'Update Available' : null;
+  String get summary =>
+      '${lastKnown ? 'Last known: ' : ''}${pending ? 'Update Available' : state.label}';
   String get signature => '$state|$message|$source|$recordedAt|$lastKnown';
 }
 

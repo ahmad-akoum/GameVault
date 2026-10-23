@@ -7,7 +7,6 @@ import 'components.dart';
 import 'collections_page.dart';
 import 'session_presentation.dart';
 import 'steam_update_indicator.dart';
-import '../services/steam_updates.dart';
 
 enum TrackingSection { summary, progress, settings }
 
@@ -52,21 +51,14 @@ class TrackingControls extends StatelessWidget {
                       ? null
                       : () => c.launch(g.appId),
                   icon: const Icon(Icons.play_arrow),
-                  label: Text(
-                    c.running(g.appId)
-                        ? 'Running'
-                        : c.pendingLaunches.containsKey(g.appId)
-                        ? 'Launching…'
-                        : 'Play game',
-                  ),
+                  label: const Text('Play Game'),
                 ),
               Text(
                 'Total ${sessionDuration(total)}  •  Active ${unknown ? 'Unknown' : sessionDuration(active)}  •  Inactive ${unknown ? 'Unknown' : sessionDuration(total - active)}',
               ),
             ],
           ),
-          if (update?.badge != null &&
-              update!.state == SteamUpdateState.available) ...[
+          if (update?.badge != null) ...[
             const SizedBox(height: 6),
             Text(
               'Opens this game in Steam. Start the update there manually.',

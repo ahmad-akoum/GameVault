@@ -17,12 +17,12 @@ class SteamUpdateAction extends StatelessWidget {
         : const Color(0xff8a4700);
     return Tooltip(
       message:
-          '${evidence.source}\n${evidence.message}\n'
+          '${evidence.source}\n'
           'Open this game in Steam. Manage updates there manually.',
       child: OutlinedButton.icon(
         onPressed: onOpen,
         icon: const Icon(Icons.system_update_alt, size: 18),
-        label: Text(evidence.state.label),
+        label: const Text('Update Available'),
         style: OutlinedButton.styleFrom(
           foregroundColor: amber,
           backgroundColor: amber.withValues(alpha: .10),
@@ -41,8 +41,7 @@ class SteamUpdateBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     if (evidence.badge == null) return const SizedBox.shrink();
     return Tooltip(
-      message:
-          '${evidence.source}\n${evidence.message}${evidence.recordedAt == null ? '' : '\nRecorded ${evidence.recordedAt!.toLocal()}'}',
+      message: '${evidence.source}\nUpdate Available',
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: const Color(0xff8a4700),
@@ -94,7 +93,11 @@ class SteamUpdatePanel extends StatelessWidget {
         ),
       ),
       const SizedBox(height: 6),
-      Text(evidence.message),
+      ExpansionTile(
+        title: const Text('Update diagnostics'),
+        tilePadding: EdgeInsets.zero,
+        children: [Text('${evidence.state.label}: ${evidence.message}')],
+      ),
       if (evidence.recordedAt != null)
         Text(
           '${evidence.source} • ${evidence.recordedAt!.toLocal()}',

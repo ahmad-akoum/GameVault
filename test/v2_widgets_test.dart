@@ -129,7 +129,7 @@ void main() {
       await tester.tapAt(tester.getCenter(find.byType(GameTile)));
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
-        find.text('Play game'),
+        find.text('Play Game'),
         200,
         scrollable: find
             .descendant(
