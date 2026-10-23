@@ -6,11 +6,11 @@ publishes a release automatically.
 
 A local-first Flutter Windows game library: discover installed games, choose what to import, launch them, and track new play sessions.
 
-**V2.2.0 - Session, artwork and responsive-layout update.**
+**V2.3.0 - Steam installation management and clearer update actions.**
 
-This working tree contains the unpublished **V2.3.0 candidate 2 (2.3.0+10)**.
-The features below describe this candidate; the approved stable release remains
-V2.2.0. Candidate testing does not upgrade the owner's stable installation.
+[Download the Windows release](https://github.com/ahmad-akoum/GameVault/releases/tag/v2.3.0).
+Play Game launches normally; Update Available opens the game in Steam for manual
+update management. No automatic downloads are initiated.
 
 ## Supported platform
 Windows x64 desktop. Flutter 3.38.5, Dart 3.10.4 and Visual Studio 2022 with Desktop development with C++ were used for validation. Android is not a supported GameVault release; prior Android build success does not establish working desktop integrations on a phone.
