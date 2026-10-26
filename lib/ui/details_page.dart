@@ -12,6 +12,7 @@ import 'activity_pages.dart';
 import '../services/steam_installation.dart';
 import '../services/steam_updates.dart';
 import 'steam_update_indicator.dart';
+import '../services/installed_storage.dart';
 
 class DetailsPage extends StatefulWidget {
   const DetailsPage({
@@ -156,7 +157,7 @@ class _DetailsPageState extends State<DetailsPage> {
         const SizedBox(height: 8),
         Text(
           [
-            g.isManual ? 'Local game' : 'Steam',
+            g.sourceLabel,
             'Windows',
             if (g.release != null) g.release!,
             ...g.genres,
@@ -173,7 +174,7 @@ class _DetailsPageState extends State<DetailsPage> {
               OutlinedButton.icon(
                 onPressed: () => c.openGameLocation(g.appId, steam: true),
                 icon: const Icon(Icons.open_in_new, size: 18),
-                label: const Text('Open in Steam'),
+                label: Text(g.isEpic ? 'Open Epic Library' : 'Open in Steam'),
               ),
             OutlinedButton.icon(
               onPressed: () => c.openGameLocation(g.appId),
@@ -182,6 +183,32 @@ class _DetailsPageState extends State<DetailsPage> {
             ),
           ],
         ),
+        const SizedBox(height: 16),
+        Wrap(
+          spacing: 12,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(
+              'Installed size: ${c.sizing.contains(g.appId) ? 'Calculating…' : storageSize(c.storage[g.appId]?.bytes)}',
+            ),
+            Text(
+              'Drive: ${c.storage[g.appId]?.drive ?? InstalledStorage(g.installPath, null, DateTime(1970)).drive}',
+            ),
+            TextButton.icon(
+              onPressed: c.sizing.contains(g.appId)
+                  ? null
+                  : () => c.refreshStorage(g.appId, force: true),
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text('Refresh storage'),
+            ),
+          ],
+        ),
+        if (c.storage[g.appId]?.message != null)
+          Text(
+            c.storage[g.appId]!.message!,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
         SizedBox(height: gap),
         const SectionTitle('Recent sessions'),
         if (!c.tracker.sessions.any((s) => s.gameId == g.appId))
@@ -240,7 +267,7 @@ class _DetailsPageState extends State<DetailsPage> {
                 ),
               ],
             ),
-            if (!g.isManual) ...[
+            if (g.isSteam) ...[
               const SizedBox(height: 16),
               const SectionTitle('Game Update Center'),
               SteamUpdatePanel(
@@ -293,7 +320,7 @@ class _DetailsPageState extends State<DetailsPage> {
               label: Text(g.favorite ? 'Favorited' : 'Favorite'),
             ),
             OutlinedButton.icon(
-              onPressed: g.isManual || c.busy.contains(g.appId)
+              onPressed: !g.isSteam || c.busy.contains(g.appId)
                   ? null
                   : () => c.refreshMetadata(g.appId),
               icon: const Icon(Icons.sync, size: 18),
@@ -463,12 +490,16 @@ class _DetailsPageState extends State<DetailsPage> {
           'Ratings are not connected. An authorized Metacritic or OpenCritic data source is required; no score is inferred.',
         ),
         const SizedBox(height: 24),
-        SectionTitle(g.isManual ? 'Local installation' : 'Steam installation'),
-        if (!g.isManual) _metadata(context, 'Steam AppID', '${g.appId}'),
+        SectionTitle('${g.sourceLabel} installation'),
+        if (g.isSteam) _metadata(context, 'Steam AppID', '${g.appId}'),
         if (g.developer != null) _metadata(context, 'Developer', g.developer!),
         if (g.publisher != null) _metadata(context, 'Publisher', g.publisher!),
         _metadata(context, 'Library folder', g.libraryPath),
-        _metadata(context, 'Installation folder', g.installPath),
+        _metadata(
+          context,
+          'Installation folder',
+          c.installations[g.appId]?.installPath ?? g.installPath,
+        ),
         if (g.metadataMessage != null)
           Padding(
             padding: const EdgeInsets.only(top: 8),

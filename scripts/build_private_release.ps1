@@ -1,9 +1,12 @@
 param(
     [Parameter(Mandatory=$true)][string]$Version,
     [string]$BuildDirectory = 'build',
-    [string]$SymbolDirectory = ''
+    [string]$SymbolDirectory = '',
+    [switch]$Candidate
 )
 $ErrorActionPreference = 'Stop'
+[string[]]$defineArgs = if ($Candidate) { @('--dart-define=GAMEVAULT_CANDIDATE=true') } else { @() }
+[string[]]$assembleDefines = if ($Candidate) { @('-dDartDefines=' + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes('GAMEVAULT_CANDIDATE=true'))) } else { @() }
 if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw 'Expected semantic version' }
 $projectRoot = Split-Path -Parent $PSScriptRoot
 Push-Location -LiteralPath $projectRoot
@@ -28,7 +31,7 @@ try {
         # point it outside the checkout so existing portable vault data is safe.
         & flutter config --build-dir $buildRelative | Out-Null
         if ($LASTEXITCODE -ne 0) { throw 'Could not configure the isolated Flutter build directory' }
-        & flutter build windows --release --no-pub -t lib/main.dart "--split-debug-info=$symbolRoot"
+        & flutter build windows --release --no-pub -t lib/main.dart "--split-debug-info=$symbolRoot" @defineArgs
         if ($LASTEXITCODE -ne 0) { throw 'Windows build failed' }
     } finally {
         if ($settingsExisted) {
@@ -47,7 +50,7 @@ try {
         if ($config.packages.name -contains 'gamevault_build') { throw 'Generated package alias already exists' }
         $config.packages += [pscustomobject]@{name='gamevault_build'; rootUri='../.dart_tool/flutter_build/'; packageUri='./'; languageVersion='3.10'}
         [IO.File]::WriteAllText($configPath, ($config | ConvertTo-Json -Depth 30), [Text.UTF8Encoding]::new($false))
-        & flutter assemble --no-version-check "--output=$buildRoot" '-dTargetPlatform=windows-x64' '-dBuildMode=release' '-dTargetFile=lib/main.dart' '-dDartObfuscation=false' "-dSplitDebugInfo=$symbolRoot" release_bundle_windows-x64_assets
+        & flutter assemble --no-version-check "--output=$buildRoot" '-dTargetPlatform=windows-x64' '-dBuildMode=release' '-dTargetFile=lib/main.dart' '-dDartObfuscation=false' "-dSplitDebugInfo=$symbolRoot" @assembleDefines release_bundle_windows-x64_assets
         if ($LASTEXITCODE -ne 0) { throw 'Portable release bundle failed' }
         Copy-Item -LiteralPath (Join-Path $buildRoot 'windows/app.so') -Destination (Join-Path $buildRoot 'windows/x64/runner/Release/data/app.so')
     } finally { [IO.File]::WriteAllBytes($configPath, $originalConfig) }

@@ -192,9 +192,23 @@ GamePlatform::GamePlatform(flutter::BinaryMessenger* messenger, HWND window) : w
           if (status <= 32) { result->Error("location_failed", "Folder could not be opened"); return; }
         }
         result->Success();
-      } else if (call.method_name() == "launch" || call.method_name() == "openWeb" || call.method_name() == "openSteam") {
+      } else if (call.method_name() == "launch" || call.method_name() == "openWeb" || call.method_name() == "openSteam" || call.method_name() == "openEpic" || call.method_name() == "openEpicLibrary") {
         std::wstring target, directory;
-        if (call.method_name() == "openWeb") {
+        if (call.method_name() == "openEpic" || call.method_name() == "openEpicLibrary") {
+          HKEY epic_key;
+          if (RegOpenKeyExW(HKEY_CLASSES_ROOT, L"com.epicgames.launcher", 0, KEY_READ, &epic_key) != ERROR_SUCCESS) {
+            result->Error("missing_launcher", "Epic Games Launcher is not registered"); return;
+          }
+          RegCloseKey(epic_key);
+          if (call.method_name() == "openEpicLibrary") {
+            target = L"com.epicgames.launcher://store/library";
+          } else {
+            const auto ns = Text(*args,"namespace"), catalog = Text(*args,"catalogId"), app = Text(*args,"appName");
+            auto valid = [](const std::string& s) { return !s.empty() && s.size() <= 160 && std::all_of(s.begin(), s.end(), [](unsigned char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_'; }); };
+            if (!valid(ns) || !valid(catalog) || !valid(app)) { result->Error("invalid_identity", "Invalid Epic identity"); return; }
+            target = L"com.epicgames.launcher://apps/" + Wide(ns) + L"%3A" + Wide(catalog) + L"%3A" + Wide(app) + L"?action=launch&silent=true";
+          }
+        } else if (call.method_name() == "openWeb") {
           target = Wide(Text(*args,"url"));
           if (target.rfind(L"https://",0) != 0) { result->Error("invalid_url","HTTPS required"); return; }
         } else if (Number(*args,"steamId") > 0) {

@@ -1,5 +1,29 @@
 # Changelog
 
+## 2.4.0 — candidate (owner acceptance pending)
+
+### Added
+- Preview and reuse selected cover/banner artwork across the two independent slots.
+- Needs Update filtering, Recently Played and Least Recently Played sorting.
+- Persistent manual sidebar collapse alongside automatic narrow layouts.
+- Cached local installed sizes and drive details with explicit refresh.
+- Optional per-user Windows startup control, disabled in development candidates.
+- Experimental Epic manifest discovery, selective import and launcher dispatch.
+
+### Changed
+- Manual Steam folders are an optional fallback; Scan again remains on Find games.
+- Settings shows the executable's full version; obsolete V2 sidebar label removed.
+
+### Fixed
+- Empty manual-folder settings no longer block automatic Steam registry/VDF discovery.
+
+### Known limitations
+- Epic update detection and online Epic artwork/metadata are deferred.
+- Installed size is logical file bytes, excludes links, and may need manual refresh.
+- Real game/launcher acceptance remains separate from automated dispatch checks.
+- Candidate startup registration is intentionally unavailable. Existing narrow
+  Expanded-banner cropping remains a future improvement.
+
 ## 2.3.0
 
 ### Added
@@ -23,7 +47,8 @@
 ### Known limitations
 - HLTB live requests and isolated persistence tests pass, but its unofficial protocol and unresolved distribution permissions remain limitations. No access-control bypass is introduced.
 - Steam state is saved local evidence, not a supported real-time client-button API. Unknown/closed/stale states never fabricate live badges or claim a game is fully up to date.
-- Real relocated-game launches, Explorer actions and download transitions await manual acceptance. No stable upgrade or publication is authorized.
+- Launcher-specific launch, relocation and update behavior depends on the local
+  installation. V2.3 publication and its stable installation upgrade are complete.
 
 ## 2.2.0
 

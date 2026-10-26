@@ -20,9 +20,7 @@ class AppVersionLabel extends StatelessWidget {
   Widget build(BuildContext context) => FutureBuilder<String?>(
     future: _version,
     builder: (context, snapshot) => Text(
-      snapshot.data == null
-          ? 'GameVault'
-          : 'GameVault ${snapshot.data!.split('+').first}',
+      snapshot.data == null ? 'GameVault' : 'GameVault ${snapshot.data!}',
       style: Theme.of(context).textTheme.titleMedium,
     ),
   );

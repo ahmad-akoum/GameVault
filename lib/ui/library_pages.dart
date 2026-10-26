@@ -5,6 +5,7 @@ import '../state/vault_controller.dart';
 import 'components.dart';
 import 'responsive.dart';
 import 'activity_pages.dart';
+import 'library_query.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({
@@ -37,9 +38,7 @@ class HomePage extends StatelessWidget {
             .where((g) => controller.tracker.lastPlayed(g.appId) != null)
             .toList()
           ..sort(
-            (a, b) => controller.tracker
-                .lastPlayed(b.appId)!
-                .compareTo(controller.tracker.lastPlayed(a.appId)!),
+            (a, b) => compareLastPlayed(a, b, controller.tracker.lastPlayed),
           );
     return ListView(
       children: [
@@ -190,7 +189,9 @@ class LibraryPage extends StatefulWidget {
 }
 
 class _LibraryPageState extends State<LibraryPage> {
-  String search = '', sort = 'Recently added';
+  String search = '';
+  LibrarySort sort = LibrarySort.recentlyAdded;
+  bool needsUpdate = false;
   GameStatus? status;
   bool favoriteOnly = false;
   final searchFocus = FocusNode();
@@ -208,35 +209,15 @@ class _LibraryPageState extends State<LibraryPage> {
 
   @override
   Widget build(BuildContext context) {
-    var games = widget.controller.games
-        .where(
-          (g) =>
-              g.title.toLowerCase().contains(search.toLowerCase()) &&
-              (status == null ||
-                  g.status == status ||
-                  (status == GameStatus.completed &&
-                      g.status == GameStatus.completionist)) &&
-              (!(widget.favorites || favoriteOnly) || g.favorite),
-        )
-        .toList();
-    games.sort(
-      (a, b) => sort == 'Title A–Z'
-          ? a.title.toLowerCase().compareTo(b.title.toLowerCase())
-          : sort == 'Most played'
-          ? widget.controller
-                .played(b.appId)
-                .compareTo(widget.controller.played(a.appId))
-          : sort == 'Last played'
-          ? (widget.controller.tracker.lastPlayed(b.appId) ?? DateTime(1970))
-                .compareTo(
-                  widget.controller.tracker.lastPlayed(a.appId) ??
-                      DateTime(1970),
-                )
-          : sort == 'Main story length'
-          ? (a.hltb?.main ?? double.infinity).compareTo(
-              b.hltb?.main ?? double.infinity,
-            )
-          : b.addedAt.compareTo(a.addedAt),
+    final games = queryLibrary(
+      widget.controller.games,
+      search: search,
+      status: status,
+      needsUpdate: needsUpdate,
+      favorites: widget.favorites || favoriteOnly,
+      sort: sort,
+      updates: widget.controller.steamUpdates,
+      lastPlayed: widget.controller.tracker.lastPlayed,
     );
     return CallbackShortcuts(
       bindings: {
@@ -270,31 +251,47 @@ class _LibraryPageState extends State<LibraryPage> {
               const SizedBox(width: 12),
               SizedBox(
                 width: 165,
-                child: DropdownButtonFormField<GameStatus?>(
-                  initialValue: status,
+                child: DropdownButtonFormField<String>(
+                  key: const ValueKey('libraryStatus'),
+                  initialValue: needsUpdate
+                      ? 'needsUpdate'
+                      : status?.name ?? 'all',
                   isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Status'),
                   items: [
                     const DropdownMenuItem(
-                      value: null,
+                      value: 'all',
                       child: Text('All games'),
                     ),
+                    const DropdownMenuItem(
+                      value: 'needsUpdate',
+                      child: Text('Needs Update'),
+                    ),
                     ...GameStatus.values.map(
-                      (s) => DropdownMenuItem(value: s, child: Text(s.label)),
+                      (s) =>
+                          DropdownMenuItem(value: s.name, child: Text(s.label)),
                     ),
                   ],
-                  onChanged: (v) => setState(() => status = v),
+                  onChanged: (v) => setState(() {
+                    needsUpdate = v == 'needsUpdate';
+                    status = GameStatus.values
+                        .where((s) => s.name == v)
+                        .firstOrNull;
+                  }),
                 ),
               ),
               const SizedBox(width: 12),
               SizedBox(
                 width: 180,
-                child: DropdownButtonFormField<String>(
+                child: DropdownButtonFormField<LibrarySort>(
+                  key: const ValueKey('librarySort'),
                   initialValue: sort,
                   isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Sort by'),
-                  items: ['Recently added', 'Title A–Z', 'Main story length']
-                      .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                  items: LibrarySort.values
+                      .map(
+                        (s) => DropdownMenuItem(value: s, child: Text(s.label)),
+                      )
                       .toList(),
                   onChanged: (v) => setState(() => sort = v!),
                 ),
@@ -317,7 +314,10 @@ class _LibraryPageState extends State<LibraryPage> {
                 ? EmptyLibrary(
                     onScan: widget.onScan,
                     filtered:
-                        search.isNotEmpty || status != null || favoriteOnly,
+                        search.isNotEmpty ||
+                        status != null ||
+                        needsUpdate ||
+                        favoriteOnly,
                     favorites: widget.favorites,
                   )
                 : VaultGrid(

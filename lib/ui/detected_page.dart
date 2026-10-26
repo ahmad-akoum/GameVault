@@ -36,7 +36,7 @@ class _DetectedPageState extends State<DetectedPage> {
       children: [
         PageHeading(
           'Find your games',
-          'Installed in Steam. Choose what belongs in your vault.',
+          'Installed in Steam or Epic Games. Choose what belongs in your vault.',
           action: OutlinedButton.icon(
             onPressed: c.scanning ? null : () => c.scan(),
             icon: const Icon(Icons.refresh, size: 18),
@@ -228,7 +228,7 @@ class _DetectedPageState extends State<DetectedPage> {
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        'Steam ${g.appId} • ${g.libraryPath}',
+                                        '${g.sourceLabel} • ${g.libraryPath}',
                                         style: Theme.of(
                                           context,
                                         ).textTheme.bodySmall,
@@ -284,7 +284,7 @@ class _DetectedPageState extends State<DetectedPage> {
                     Text(
                       c.importing
                           ? 'Games are saved first; online information is fetched in the background.'
-                          : 'Only selected games are added. Steam files stay untouched.',
+                          : 'Only selected games are added. Launcher and game files stay untouched.',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],

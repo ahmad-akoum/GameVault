@@ -127,6 +127,21 @@ class _ArtworkManagerState extends State<ArtworkManager> {
       });
     }
   });
+  Future<void> reuseOther() => work(() async {
+    final path = cover ? game.profileArtworkPath : game.coverPath;
+    if (path == null) {
+      throw const ArtworkFailure('The other artwork has not been selected.');
+    }
+    await store.validate(path);
+    if (mounted) {
+      setState(() {
+        additions[cover]!.add(path);
+        draft = path;
+        message =
+            'Preview ready. Choose a fit and Apply; the other artwork stays independent.';
+      });
+    }
+  });
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -353,7 +368,32 @@ class _ArtworkManagerState extends State<ArtworkManager> {
                               icon: const Icon(Icons.file_upload_outlined),
                               label: const Text('Import image'),
                             ),
-                            if (!game.isManual)
+                            Tooltip(
+                              message:
+                                  (cover
+                                          ? game.profileArtworkPath
+                                          : game.coverPath) ==
+                                      null
+                                  ? 'Select artwork in the other tab first.'
+                                  : 'Preview the other selected image without creating a duplicate file.',
+                              child: OutlinedButton.icon(
+                                onPressed:
+                                    busy ||
+                                        (cover
+                                                ? game.profileArtworkPath
+                                                : game.coverPath) ==
+                                            null
+                                    ? null
+                                    : reuseOther,
+                                icon: const Icon(Icons.swap_horiz),
+                                label: Text(
+                                  cover
+                                      ? 'Use profile banner'
+                                      : 'Use library cover',
+                                ),
+                              ),
+                            ),
+                            if (game.isSteam)
                               OutlinedButton.icon(
                                 onPressed: busy ? null : checkSteam,
                                 icon: const Icon(Icons.cloud_download_outlined),
