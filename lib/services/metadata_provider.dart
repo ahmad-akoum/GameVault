@@ -42,6 +42,12 @@ class SteamMetadataProvider implements GameMetadataProvider {
 
   @override
   Future<VaultGame> enrich(VaultGame game) async {
+    if (!game.isSteam) {
+      return game.copy(
+        metadataMessage:
+            'Local installation information only. Import artwork you have permission to use.',
+      );
+    }
     var updated = game;
     String? header;
     try {

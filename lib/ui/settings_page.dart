@@ -23,13 +23,29 @@ class SettingsPage extends StatelessWidget {
     return ListView(
       children: [
         const PageHeading('Settings', 'Make GameVault feel at home.'),
+        const SectionTitle('General'),
+        SwitchListTile.adaptive(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Launch GameVault when Windows starts'),
+          subtitle: Text(
+            c.startup?.allowed == true
+                ? c.startupMessage ??
+                      'Starts this installed application when you sign in. No administrator access is required.'
+                : 'Available in an approved stable installation. Development candidates never change Windows startup.',
+          ),
+          value: c.startup?.allowed == true && c.startupRegistered,
+          onChanged: c.startup?.allowed == true && !c.startupChanging
+              ? c.setStartup
+              : null,
+        ),
+        const SizedBox(height: 20),
         TrackingSettings(controller: c),
         AppearanceControls(controller: c),
         const SizedBox(height: 32),
         const Divider(),
         const SizedBox(height: 28),
         SectionTitle(
-          'Steam library folders',
+          'Steam folders (optional fallback)',
           action: OutlinedButton.icon(
             onPressed: () => _addFolder(context),
             icon: const Icon(Icons.create_new_folder_outlined, size: 17),
@@ -37,7 +53,7 @@ class SettingsPage extends StatelessWidget {
           ),
         ),
         Text(
-          'Choose a Steam installation or SteamLibrary folder. Scans also read Steam’s library configuration to find linked libraries.',
+          'Steam and its linked libraries are discovered automatically. Add a folder only if automatic discovery misses a library.',
           style: TextStyle(color: scheme.onSurfaceVariant),
         ),
         const SizedBox(height: 18),
@@ -49,7 +65,7 @@ class SettingsPage extends StatelessWidget {
               borderRadius: BorderRadius.circular(5),
             ),
             child: const Text(
-              'No folders added yet. Add your Steam library to get started.',
+              'No manual folders configured. Automatic discovery is still available from Find games.',
             ),
           ),
         ...c.settings.paths.map(
@@ -81,14 +97,6 @@ class SettingsPage extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 18),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: FilledButton.icon(
-            onPressed: c.settings.paths.isEmpty || c.scanning ? null : onScan,
-            icon: const Icon(Icons.manage_search, size: 19),
-            label: const Text('Scan libraries'),
-          ),
-        ),
         const SizedBox(height: 32),
         const Divider(),
         const SizedBox(height: 28),

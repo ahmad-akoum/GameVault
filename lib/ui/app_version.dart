@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 
 class AppVersionLabel extends StatelessWidget {
   const AppVersionLabel({super.key});
+  // Settings shows the public version; native/package metadata retains +build.
+  static String publicVersion(String version) => version.split('+').first;
   static final Future<String?> _version = _read();
   static Future<String?> _read() async {
     try {
@@ -22,7 +24,7 @@ class AppVersionLabel extends StatelessWidget {
     builder: (context, snapshot) => Text(
       snapshot.data == null
           ? 'GameVault'
-          : 'GameVault ${snapshot.data!.split('+').first}',
+          : 'GameVault ${publicVersion(snapshot.data!)}',
       style: Theme.of(context).textTheme.titleMedium,
     ),
   );

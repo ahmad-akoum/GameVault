@@ -11,6 +11,9 @@ import '../services/hltb_provider.dart';
 import '../services/metadata_provider.dart';
 import '../services/windows_games.dart';
 import '../services/session_tracker.dart';
+import '../services/epic_scanner.dart';
+import '../services/installed_storage.dart';
+import '../services/windows_startup.dart';
 
 class VaultController extends ChangeNotifier {
   VaultController({
@@ -19,12 +22,115 @@ class VaultController extends ChangeNotifier {
     required this.metadata,
     required this.hltb,
     this.platform,
+    this.epicScanner,
+    this.storageService,
+    this.startup,
   });
   final LocalStore store;
   final SteamScanner scanner;
   final GameMetadataProvider metadata;
   final HltbProvider hltb;
   final GamePlatform? platform;
+  final EpicScanner? epicScanner;
+  final InstalledStorageService? storageService;
+  final WindowsStartup? startup;
+  bool startupRegistered = false, startupChanging = false;
+  Future<void>? _startupJob;
+  String? startupMessage;
+  final Map<int, InstalledStorage> storage = {};
+  final Set<int> sizing = {};
+
+  Future<void> refreshStartup() async {
+    if (startup?.allowed != true) return;
+    try {
+      final command = await startup!.read();
+      startupRegistered =
+          command?.toLowerCase() == startup!.command.toLowerCase();
+      startupMessage = command != null && !startupRegistered
+          ? 'The startup path differs from this installation. Toggle on to update it.'
+          : null;
+    } catch (_) {
+      startupMessage = 'Windows startup registration could not be read.';
+    }
+    if (!_closing) notifyListeners();
+  }
+
+  Future<void> setStartup(bool enabled) {
+    if (_closing || storageBlocked) return Future.value();
+    return _startupJob ??= _setStartup(
+      enabled,
+    ).whenComplete(() => _startupJob = null);
+  }
+
+  Future<void> _setStartup(bool enabled) async {
+    if (startup?.allowed != true || startupChanging) return;
+    startupChanging = true;
+    notifyListeners();
+    try {
+      final previous = await startup!.read();
+      await startup!.setEnabled(enabled);
+      var saved = false;
+      await _mutate(() async {
+        saved = await _commit(games, settings.copy(startupEnabled: enabled));
+      });
+      if (!saved) await startup!.restore(previous);
+      await refreshStartup();
+    } catch (_) {
+      startupMessage =
+          'Startup preference could not be changed. Check the installed path and Windows permissions.';
+    } finally {
+      startupChanging = false;
+      if (!_closing) notifyListeners();
+    }
+  }
+
+  Future<InstallationEvidence> _inspect(VaultGame g) => g.isEpic
+      ? epicScanner?.inspect(g) ??
+            Future.value(
+              const InstallationEvidence(
+                InstallationStatus.unknown,
+                'Epic discovery is unavailable.',
+              ),
+            )
+      : SteamInstallation(scanner).inspect(g, settings.paths);
+
+  Future<String> _directoryFor(VaultGame g) async {
+    if (!g.isEpic) {
+      return SteamInstallation(scanner).directoryFor(g, settings.paths);
+    }
+    final evidence = await _inspect(g);
+    if (evidence.installPath == null) {
+      throw const FileSystemException('Epic installation is unavailable.');
+    }
+    return evidence.installPath!;
+  }
+
+  Future<void> refreshStorage(int id, {bool force = false}) async {
+    final g = game(id);
+    if (g == null || storageService == null || !sizing.add(id) || _closing) {
+      return;
+    }
+    notifyListeners();
+    try {
+      final path = await _directoryFor(g);
+      final value = await storageService!.inspect(path, refresh: force);
+      if (!_closing && game(id) != null) storage[id] = value;
+    } catch (_) {
+      if (!_closing && game(id) != null) {
+        storage[id] = InstalledStorage(
+          g.installPath,
+          null,
+          DateTime.now(),
+          message:
+              'Installation could not be verified. Refresh its location first.',
+        );
+      }
+    } finally {
+      sizing.remove(id);
+      if (!_closing) notifyListeners();
+    }
+  }
+
   final SessionTracker tracker = SessionTracker();
   final Stopwatch _clock = Stopwatch();
   Timer? _monitor;
@@ -52,7 +158,7 @@ class VaultController extends ChangeNotifier {
       );
     } catch (_) {
       next = {
-        for (final g in games.where((g) => !g.isManual))
+        for (final g in games.where((g) => g.isSteam))
           g.appId: SteamUpdateEvidence.unknown,
       };
     }
@@ -91,12 +197,11 @@ class VaultController extends ChangeNotifier {
     final g = game(id);
     if (g == null || _closing) return;
     try {
-      final evidence = await SteamInstallation(
-        scanner,
-      ).inspect(g, settings.paths);
+      final evidence = await _inspect(g);
       if (_closing) return;
       installations[id] = evidence;
       notifyListeners();
+      unawaited(refreshStorage(id));
     } catch (_) {
       /* Inconclusive evidence stays Unknown. */
     }
@@ -107,9 +212,7 @@ class VaultController extends ChangeNotifier {
     if (original == null || !refreshingInstallation.add(id)) return;
     notifyListeners();
     try {
-      final evidence = await SteamInstallation(
-        scanner,
-      ).inspect(original, settings.paths);
+      final evidence = await _inspect(original);
       installations[id] = evidence;
       if (evidence.installPath != null) {
         String? relocatedExecutable;
@@ -154,6 +257,7 @@ class VaultController extends ChangeNotifier {
               '${error ?? ''} The selected tracking executable is unavailable; choose its current location or use automatic detection.';
         }
       }
+      unawaited(refreshStorage(id, force: true));
     } catch (_) {
       if (feedback) {
         error =
@@ -175,15 +279,17 @@ class VaultController extends ChangeNotifier {
     if (g == null) return;
     try {
       if (steam) {
-        await WindowsGames.openSteam(g.appId);
+        if (g.isSteam) {
+          await WindowsGames.openSteam(g.appId);
+        } else if (g.isEpic) {
+          await WindowsGames.openEpicLibrary();
+        }
       } else if (executable &&
           g.executablePath != null &&
           await File(g.executablePath!).exists()) {
         await WindowsGames.openLocation(g.executablePath!, select: true);
       } else {
-        final directory = await SteamInstallation(
-          scanner,
-        ).directoryFor(g, settings.paths);
+        final directory = await _directoryFor(g);
         await WindowsGames.openLocation(directory);
       }
     } catch (_) {
@@ -215,6 +321,7 @@ class VaultController extends ChangeNotifier {
       storageBlocked = true;
     }
     initialized = true;
+    if (!storageBlocked) unawaited(refreshStartup());
     if (!storageBlocked && platform != null) {
       _clock.start();
       _monitor = Timer.periodic(const Duration(seconds: 2), (_) => pollGames());
@@ -282,10 +389,40 @@ class VaultController extends ChangeNotifier {
     scannedPaths = [];
     notifyListeners();
     try {
-      final result = await scanner.scan(settings.paths);
-      detected = result.games;
-      scanWarnings = result.warnings;
-      scannedPaths = result.paths;
+      try {
+        final result = await scanner.scan(settings.paths);
+        detected = result.games;
+        scanWarnings = result.warnings;
+        scannedPaths = result.paths;
+      } on ScanFailure catch (e) {
+        scanWarnings.add(e.message);
+      }
+      final epic = await epicScanner?.scan();
+      if (epic != null) {
+        scanWarnings.addAll(epic.warnings);
+        var lowest = [
+          ...games.map((g) => g.appId),
+          ...tracker.sessions.map((s) => s.gameId),
+        ].fold<int>(0, (a, b) => a < b ? a : b);
+        for (final item in epic.games) {
+          final existing = games
+              .where((g) => g.isEpic && g.epic?.key == item.identity.key)
+              .firstOrNull;
+          detected.add(
+            SteamGame(
+              appId: existing?.appId ?? --lowest,
+              name: item.title,
+              installPath: item.path,
+              libraryPath: p.dirname(item.path),
+              source: GameSource.epic,
+              epic: item.identity,
+            ),
+          );
+        }
+        detected.sort(
+          (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+        );
+      }
     } on ScanFailure catch (e) {
       error = e.message;
     } catch (e) {
@@ -439,8 +576,11 @@ class VaultController extends ChangeNotifier {
     pendingLaunches[id] = _clock.elapsed.inSeconds + 120;
     notifyListeners();
     try {
-      if (!g.isManual && !await Directory(g.installPath).exists()) {
+      if (g.isEpic || (g.isSteam && !await Directory(g.installPath).exists())) {
         await refreshInstallation(id, feedback: false);
+        if (g.isEpic && installations[id]?.installPath == null) {
+          throw const FileSystemException('Epic installation unavailable');
+        }
       }
       await platform!.launch(game(id) ?? g);
       if (!settings.trackingEnabled) {
@@ -452,7 +592,7 @@ class VaultController extends ChangeNotifier {
     } catch (_) {
       pendingLaunches.remove(id);
       error =
-          'Could not launch ${g.title}. Check its installation, executable and Steam availability.';
+          'Could not launch ${g.title}. Check its installation, executable and launcher availability.';
       notifyListeners();
     }
   }
@@ -535,6 +675,7 @@ class VaultController extends ChangeNotifier {
     final lowest = [
       ...games.map((g) => g.appId),
       ...tracker.sessions.map((s) => s.gameId),
+      ...detected.map((g) => g.appId),
     ].fold<int>(0, (id, candidate) => candidate < id ? candidate : id);
     await _commit([
       ...games,
@@ -675,6 +816,7 @@ class VaultController extends ChangeNotifier {
     _updateMonitor?.cancel();
     await _updatePoll;
     await _poll;
+    await _startupJob;
     await _mutate(() async {
       final hasOpen = tracker.sessions.any((s) => s.open);
       tracker.closeAll('GameVault closed');

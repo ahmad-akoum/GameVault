@@ -12,7 +12,7 @@ spec.loader.exec_module(guard)
 
 class PrivacyGuardTests(unittest.TestCase):
     def test_private_filenames_and_allowed_runtime(self):
-        for name in ['vault_data/vault.json', 'previous_versions/app.exe', '.env.local', 'backup.db-wal', 'credentials/key.dpapi', '../outside.txt']:
+        for name in ['vault_data/vault.json', 'development_artifacts/report.json', 'previous_versions/app.exe', '.env.local', 'backup.db-wal', 'credentials/key.dpapi', '../outside.txt']:
             self.assertTrue(guard.private_name(name), name)
         for name in ['lib/models/game.dart', '.env.example', 'windows/runner/resources/app_icon.ico']:
             self.assertFalse(guard.private_name(name), name)

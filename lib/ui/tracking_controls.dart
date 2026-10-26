@@ -23,7 +23,7 @@ class TrackingControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = controller, g = game;
-    final update = g.isManual ? null : c.steamUpdates[g.appId];
+    final update = g.isSteam ? c.steamUpdates[g.appId] : null;
     final unknown = hasUnknownActivity(
       c.tracker.sessions.where((s) => s.gameId == g.appId),
     );

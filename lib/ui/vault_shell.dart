@@ -35,10 +35,6 @@ class _VaultShellState extends State<VaultShell> {
   });
   void _open(VaultGame g) => setState(() => detail = g.appId);
   void _scan() {
-    if (widget.controller.settings.paths.isEmpty) {
-      _navigate(3);
-      return;
-    }
     _navigate(4);
     widget.controller.scan();
   }
@@ -75,7 +71,9 @@ class _VaultShellState extends State<VaultShell> {
       );
     }
     final narrow = MediaQuery.sizeOf(context).width < 600;
-    final compact = !narrow && MediaQuery.sizeOf(context).width < 1050;
+    final canToggleSidebar = MediaQuery.sizeOf(context).width >= 1050;
+    final compact =
+        !narrow && (!canToggleSidebar || c.settings.sidebarCollapsed);
     final content = detail != null
         ? DetailsPage(
             key: ValueKey(detail),
@@ -128,36 +126,58 @@ class _VaultShellState extends State<VaultShell> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      compact ? 19 : 24,
-                      20,
-                      compact ? 19 : 20,
-                      24,
-                    ),
-                    child: Row(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
+                    child: Column(
                       children: [
-                        Icon(
-                          Icons.inventory_2_outlined,
-                          color: scheme.primary,
-                          size: 27,
-                        ),
-                        if (!compact) ...[
-                          const SizedBox(width: 12),
-                          const Expanded(
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                'GameVault',
-                                style: TextStyle(
-                                  fontSize: 21,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: -0.6,
+                        if (compact)
+                          Icon(
+                            Icons.inventory_2_outlined,
+                            color: scheme.primary,
+                            size: 27,
+                          ),
+                        Row(
+                          children: [
+                            if (!compact) ...[
+                              Icon(
+                                Icons.inventory_2_outlined,
+                                color: scheme.primary,
+                                size: 27,
+                              ),
+                              const SizedBox(width: 10),
+                              const Expanded(
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    'GameVault',
+                                    style: TextStyle(
+                                      fontSize: 21,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
-                          ),
-                        ],
+                            ],
+                            if (canToggleSidebar)
+                              IconButton(
+                                key: const ValueKey('sidebarToggle'),
+                                tooltip: compact
+                                    ? 'Expand navigation'
+                                    : 'Collapse navigation',
+                                onPressed: () => c.setSettings(
+                                  c.settings.copy(
+                                    sidebarCollapsed:
+                                        !c.settings.sidebarCollapsed,
+                                  ),
+                                ),
+                                icon: Icon(
+                                  compact
+                                      ? Icons.chevron_right
+                                      : Icons.chevron_left,
+                                ),
+                              ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -178,23 +198,7 @@ class _VaultShellState extends State<VaultShell> {
                   _nav(7, Icons.add_box_outlined, 'Add local game', compact),
                   const Spacer(),
                   _nav(3, Icons.tune, 'Settings', compact),
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      compact ? 0 : 24,
-                      18,
-                      compact ? 0 : 24,
-                      22,
-                    ),
-                    child: Text(
-                      compact ? 'V2' : 'LOCAL LIBRARY  /  V2',
-                      textAlign: compact ? TextAlign.center : TextAlign.start,
-                      style: TextStyle(
-                        fontSize: 10,
-                        letterSpacing: 1.2,
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
+                  const SizedBox(height: 20),
                 ],
               ),
             ),

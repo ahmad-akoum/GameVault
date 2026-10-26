@@ -6,11 +6,16 @@ publishes a release automatically.
 
 A local-first Flutter Windows game library: discover installed games, choose what to import, launch them, and track new play sessions.
 
-**V2.3.0 - Steam installation management and clearer update actions.**
+**V2.4.0 - Library customization and experimental Epic Games support.**
 
-[Download the Windows release](https://github.com/ahmad-akoum/GameVault/releases/tag/v2.3.0).
+[Download the Windows release](https://github.com/ahmad-akoum/GameVault/releases/tag/v2.4.0).
 Play Game launches normally; Update Available opens the game in Steam for manual
 update management. No automatic downloads are initiated.
+
+V2.4.0 adds shared selected
+artwork, update filtering, play-history sorting, sidebar collapse, cached storage
+details, guarded Windows startup settings, and experimental Epic discovery.
+See [release notes](docs/releases/v2.4.0.md).
 
 ## Supported platform
 Windows x64 desktop. Flutter 3.38.5, Dart 3.10.4 and Visual Studio 2022 with Desktop development with C++ were used for validation. Android is not a supported GameVault release; prior Android build success does not establish working desktop integrations on a phone.
@@ -50,13 +55,13 @@ flutter run -d windows
 The preparation script creates local plugin junctions where symlink privileges are unavailable. If dependency resolution reports missing symlink support, run the script then repeat pub get. Do not upgrade dependencies just to build this release.
 
 ```powershell
-$Build = Join-Path (Split-Path (Get-Location) -Qualifier) 'GameVaultBuilds\v2.2.0'
-$Symbols = Join-Path $env:LOCALAPPDATA 'GameVaultPrivateSymbols\v2.2.0'
-.\scripts\build_private_release.ps1 -Version 2.2.0 -BuildDirectory $Build -SymbolDirectory $Symbols
-python tool/package_release.py 2.2.0 --build-dir $Build
+$Build = Join-Path (Get-Location) 'development_artifacts\candidates\GameVaultV24Candidate2Build'
+$Symbols = Join-Path (Get-Location) 'development_artifacts\private_symbols\GameVaultV24Candidate2PrivateSymbols'
+.\scripts\build_private_release.ps1 -Version 2.4.0 -BuildDirectory $Build -SymbolDirectory $Symbols -Candidate
+python tool/package_release.py 2.4.0 --build-dir $Build --output-dir development_artifacts/release_artifacts/v2.4.0-candidate-2
 ```
 
-The isolated build output is `$Build\windows\x64\runner\Release`. Packaging selects runtime files only and refuses to overwrite an existing versioned ZIP. Verify pubspec version and the executable's ProductVersion before packaging. See [developer guide](docs/DEVELOPMENT.md).
+This builds a candidate with Windows startup registration disabled. Use a fresh output directory for each candidate and keep its copied vault isolated. The isolated build output is `$Build\windows\x64\runner\Release`. Packaging selects runtime files only and refuses to overwrite an existing versioned ZIP. Verify pubspec version and the executable's ProductVersion before packaging. See [developer guide](docs/DEVELOPMENT.md).
 
 ## Privacy and limitations
 Data is stored in vault_data beside the executable, or the directory selected by GAMEVAULT_DATA_DIR. The application keeps no keystroke or controller-button history. Metadata services receive requests; local tracking is not an authenticated Steam account integration.
@@ -65,7 +70,10 @@ Historical Steam hours and historical AFK time cannot be reconstructed. Monitori
 
 Windows high-refresh frame measurements and clean-machine installation remain unverified. The scrolling changes do not establish a measured 120/180 FPS result.
 
-Live HowLongToBeat website lookup, refresh and script inspection are disabled in this release pending an authorized integration. Previously saved estimates and saved matches remain available offline. This change does not by itself resolve every licensing question. Ratings remain reserved for V3.
+Live HowLongToBeat search, saved-match selection and refresh were restored in
+V2.3 and are retained in V2.4. This is an independent, unofficial integration;
+service availability and distribution permissions are not guaranteed. Existing
+saved values remain local. Ratings remain reserved for V3.
 
 ## Screenshots
 Screenshots of personal libraries are intentionally excluded. No private artwork cache or game/session database is distributed.

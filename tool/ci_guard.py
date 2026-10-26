@@ -7,7 +7,7 @@ import zipfile
 from pathlib import PurePosixPath
 
 PRIVATE_PARTS = {'vault_data', 'credentials', 'secrets', 'backups', 'previous_versions',
-                 'release_artifacts', 'build', '.ci-build', '.dart_tool', 'logs', 'cache'}
+                 'release_artifacts', 'development_artifacts', 'build', '.ci-build', '.dart_tool', 'logs', 'cache'}
 SOURCE_BINARIES = {'.exe', '.dll', '.pdb', '.zip', '.apk', '.aab', '.msix', '.msi', '.dpapi', '.pfx', '.p12', '.pem', '.key', '.jks', '.keystore'}
 PATTERNS = [
     rb'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----',

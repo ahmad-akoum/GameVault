@@ -27,6 +27,20 @@ class WindowsGames implements GamePlatform {
 
   @override
   Future<void> launch(VaultGame game) async {
+    if (game.isEpic) {
+      if (game.epic?.valid != true ||
+          !await Directory(game.installPath).exists()) {
+        throw const FileSystemException(
+          'Epic installation or launcher identity is unavailable.',
+        );
+      }
+      await channel.invokeMethod<void>('openEpic', {
+        'namespace': game.epic!.namespace,
+        'catalogId': game.epic!.catalogId,
+        'appName': game.epic!.appName,
+      });
+      return;
+    }
     if (game.isManual) {
       final path = game.executablePath;
       if (path == null ||
@@ -95,6 +109,9 @@ class WindowsGames implements GamePlatform {
     if (appId <= 0) return;
     await channel.invokeMethod<void>('openSteam', {'steamId': appId});
   }
+
+  static Future<void> openEpicLibrary() =>
+      channel.invokeMethod<void>('openEpicLibrary', <String, Object>{});
 
   static Future<void> openWeb(String url) async {
     final uri = Uri.tryParse(url);

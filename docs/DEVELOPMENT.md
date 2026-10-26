@@ -50,7 +50,7 @@ checkout is only an export/review destination. Never push original local history
 
 ## Roadmap and repository protection
 
-Use the V2.3.0 milestone and linked issues for approved scope. Native sub-issues
+Use the V2.4.0 milestone and linked issues for the currently approved candidate scope. Native sub-issues
 and blocked-by links are available. The current CLI lacks Projects scopes, so
 no GitHub Project was created. If the owner later authorizes browser-based
 `gh auth refresh -s project`, create a simple board using existing issues:
@@ -87,18 +87,21 @@ and keeps debug symbols private. Do not run concurrent builds while it runs.
 verifies and packages the complete runtime, excluding PDBs/vault_data. Run the
 privacy guard on the ZIP and verify SHA256SUMS.txt. Never overwrite an old ZIP.
 
-## Current V2.3 provenance
+## Current candidate provenance
 
-Tracking: [V2.3.0 milestone](https://github.com/ahmad-akoum/GameVault/milestone/1),
-[acceptance/release gate #2](https://github.com/ahmad-akoum/GameVault/issues/2),
-[Steam Update Center parent #6](https://github.com/ahmad-akoum/GameVault/issues/6),
-and [workflow foundation #1](https://github.com/ahmad-akoum/GameVault/issues/1).
+V2.3.0 is published and installed as the approved stable version. Earlier
+candidate and research history stays preserved. V2.4 work is tracked by
+[the V2.4 milestone](https://github.com/ahmad-akoum/GameVault/milestone/2),
+[quality-of-life candidate #22](https://github.com/ahmad-akoum/GameVault/issues/22)
+and [artwork reuse #21](https://github.com/ahmad-akoum/GameVault/issues/21).
+Candidate acceptance, release publication and stable replacement remain pending.
 
-Candidate 2 (2.3.0+10) was implemented and built before Issue tracking existed.
-It was checkpointed as one present-day local commit, not reconstructed into a
-fictional development history. The clean PR is a reviewed source export. Owner
-acceptance/publication is pending; stable remains V2.2.0. Existing candidate and
-live-test evidence is preserved; this workflow task changes no application code.
+Use a fresh build root under `development_artifacts/candidates` and the private
+helper's `-Candidate` switch. Copy a verified personal-vault backup only into
+that candidate, never select the stable vault as a data override. Keep symbols
+in `development_artifacts/private_symbols`. The root is ignored and is outside
+Flutter's disposable root `build` directory. Older moved build trees retain
+historical CMake paths and are evidence, not reusable incremental build roots.
 
 ## Verification tooling
 

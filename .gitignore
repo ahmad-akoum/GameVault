@@ -57,6 +57,7 @@ app.*.map.json
 *.db
 *.sqlite*
 /release_artifacts/
+/development_artifacts/
 /previous_versions/
 /.ci-build/
 **/credentials/

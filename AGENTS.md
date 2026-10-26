@@ -64,6 +64,23 @@ search/refresh is enabled in the current local candidate. Never
 represent HLTB restoration as complete while live access is blocked, or bypass
 website access controls to restore it.
 
+## V2.4 candidate and artifact locations
+
+V2.4.0+17 is installed at the usual stable Release path, upgraded from the
+verified official-build package with the owner's latest personalized V2.4 vault.
+The owner has approved V2.4 publication and PR #23 merge. The complete V2.3 runtime/vault is
+preserved under `previous_versions/v2.3.0/Release` and in a private verified backup.
+Develop only in an isolated candidate under `development_artifacts/candidates`,
+with a separately copied vault. Keep earlier artifacts and backups intact. Use the private build helper
+with `-Candidate`; candidate startup-registration changes must stay disabled.
+The entire `development_artifacts` tree is private and Git-ignored, outside the
+disposable root build directory. Do not use it as a second source checkout.
+
+Version convention: fixes increment the patch (2.4.0 to 2.4.1), feature updates
+increment the minor (2.4.0 to 2.5.0), and the feature milestone after 2.9.0 is
+3.0.0. That numbering does not require an architectural rewrite. A candidate
+version number is not approval to merge, tag, publish, or replace stable.
+
 ## Feature documentation
 
 Whenever implementing or significantly changing an important feature, add or

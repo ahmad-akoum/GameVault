@@ -189,9 +189,6 @@ class SteamScanner {
   }
 
   Future<ScanResult> scan(List<String> roots) async {
-    if (roots.isEmpty) {
-      throw const ScanFailure('Choose a Steam library folder before scanning.');
-    }
     final paths = <String>[];
     final warnings = <String>[];
     final games = <int, SteamGame>{};

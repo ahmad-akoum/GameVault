@@ -1,5 +1,34 @@
 enum AppearanceMode { dark, light, system }
 
+enum GameSource { steam, local, epic }
+
+/// Launcher identity, independent from the local vault/session integer ID.
+class EpicIdentity {
+  const EpicIdentity(this.namespace, this.catalogId, this.appName);
+  final String namespace, catalogId, appName;
+  bool get valid => [
+    namespace,
+    catalogId,
+    appName,
+  ].every((s) => RegExp(r'^[A-Za-z0-9_-]{1,160}$').hasMatch(s));
+  String get key => '$namespace:$catalogId:$appName';
+  String get launchUri {
+    if (!valid) throw const FormatException('Invalid Epic identity');
+    return 'com.epicgames.launcher://apps/${Uri.encodeComponent(key)}?action=launch&silent=true';
+  }
+
+  Map<String, dynamic> toJson() => {
+    'namespace': namespace,
+    'catalogId': catalogId,
+    'appName': appName,
+  };
+  factory EpicIdentity.fromJson(Map<String, dynamic> j) => EpicIdentity(
+    j['namespace'] as String,
+    j['catalogId'] as String,
+    j['appName'] as String,
+  );
+}
+
 enum GameStatus {
   playing('Playing'),
   backlog('Play Later'),
@@ -57,17 +86,25 @@ class HltbEntry {
   };
 }
 
+/// Shared discovery record; the historical name is retained for compatibility.
 class SteamGame {
   const SteamGame({
     required this.appId,
     required this.name,
     required this.installPath,
     required this.libraryPath,
+    this.source = GameSource.steam,
+    this.epic,
   });
+  final GameSource source;
+  final EpicIdentity? epic;
+  String get sourceLabel =>
+      source == GameSource.epic ? 'Epic Games (experimental)' : 'Steam $appId';
   final int appId;
   final String name, installPath, libraryPath;
-  String get coverUrl =>
-      'https://cdn.akamai.steamstatic.com/steam/apps/$appId/library_600x900.jpg';
+  String? get coverUrl => source == GameSource.steam
+      ? 'https://cdn.akamai.steamstatic.com/steam/apps/$appId/library_600x900.jpg'
+      : null;
 }
 
 /// Additive artwork preferences. Null on legacy records until first management.
@@ -133,7 +170,19 @@ class VaultGame {
     this.executablePath,
     this.collections = const [],
     this.progressPercent,
-  }) : addedAt = addedAt ?? DateTime.now();
+    GameSource? source,
+    this.epic,
+  }) : source = source ?? (appId < 0 ? GameSource.local : GameSource.steam),
+       addedAt = addedAt ?? DateTime.now();
+  final GameSource source;
+  final EpicIdentity? epic;
+  bool get isSteam => source == GameSource.steam;
+  bool get isEpic => source == GameSource.epic;
+  String get sourceLabel => switch (source) {
+    GameSource.steam => 'Steam',
+    GameSource.local => 'Local game',
+    GameSource.epic => 'Epic Games (experimental)',
+  };
   final ArtworkPreferences? artwork;
   // Freeze the legacy cover-as-banner fallback when managing artwork, so a
   // cover change cannot silently change a game that had no separate banner.
@@ -142,7 +191,7 @@ class VaultGame {
   final String? executablePath;
   final List<String> collections;
   final int? progressPercent;
-  bool get isManual => appId < 0;
+  bool get isManual => source == GameSource.local;
   final int appId;
   final String title, installPath, libraryPath;
   final DateTime addedAt;
@@ -160,6 +209,8 @@ class VaultGame {
     title: g.name,
     installPath: g.installPath,
     libraryPath: g.libraryPath,
+    source: g.source,
+    epic: g.epic,
   );
   VaultGame copy({
     String? title,
@@ -190,6 +241,8 @@ class VaultGame {
     bool clearMatch = false,
   }) => VaultGame(
     appId: appId,
+    source: source,
+    epic: epic,
     title: title ?? this.title,
     installPath: installPath ?? this.installPath,
     libraryPath: libraryPath ?? this.libraryPath,
@@ -219,6 +272,8 @@ class VaultGame {
   );
   Map<String, dynamic> toJson() => {
     'appId': appId,
+    'source': source.name,
+    if (epic != null) 'epic': epic!.toJson(),
     'title': title,
     'installPath': installPath,
     'libraryPath': libraryPath,
@@ -246,6 +301,12 @@ class VaultGame {
   };
   factory VaultGame.fromJson(Map<String, dynamic> j) => VaultGame(
     appId: j['appId'] as int,
+    source: j['source'] == null
+        ? null
+        : GameSource.values.byName(j['source'] as String),
+    epic: j['epic'] is Map
+        ? EpicIdentity.fromJson(Map<String, dynamic>.from(j['epic']))
+        : null,
     title: j['title'] as String,
     installPath: j['installPath'] as String,
     libraryPath: j['libraryPath'] as String,
@@ -296,6 +357,8 @@ class VaultSettings {
     this.focusGrace = 10,
     this.activityAdjusted = true,
     this.trackingEnabled = true,
+    this.sidebarCollapsed = false,
+    this.startupEnabled = false,
   });
   final AppearanceMode theme;
   final int accent;
@@ -304,6 +367,7 @@ class VaultSettings {
   final List<String> paths, collections;
   final int idleThreshold, focusGrace;
   final bool activityAdjusted, trackingEnabled;
+  final bool sidebarCollapsed, startupEnabled;
   VaultSettings copy({
     AppearanceMode? theme,
     int? accent,
@@ -317,6 +381,8 @@ class VaultSettings {
     int? focusGrace,
     bool? activityAdjusted,
     bool? trackingEnabled,
+    bool? sidebarCollapsed,
+    bool? startupEnabled,
   }) => VaultSettings(
     theme: theme ?? this.theme,
     accent: accent ?? this.accent,
@@ -329,6 +395,8 @@ class VaultSettings {
     focusGrace: focusGrace ?? this.focusGrace,
     activityAdjusted: activityAdjusted ?? this.activityAdjusted,
     trackingEnabled: trackingEnabled ?? this.trackingEnabled,
+    sidebarCollapsed: sidebarCollapsed ?? this.sidebarCollapsed,
+    startupEnabled: startupEnabled ?? this.startupEnabled,
   );
   Map<String, dynamic> toJson() => {
     'theme': theme.name,
@@ -342,6 +410,8 @@ class VaultSettings {
     'focusGrace': focusGrace,
     'activityAdjusted': activityAdjusted,
     'trackingEnabled': trackingEnabled,
+    'sidebarCollapsed': sidebarCollapsed,
+    'startupEnabled': startupEnabled,
   };
   factory VaultSettings.fromJson(Map<String, dynamic> j) => VaultSettings(
     theme: AppearanceMode.values.byName(j['theme'] as String? ?? 'dark'),
@@ -359,5 +429,7 @@ class VaultSettings {
     focusGrace: ((j['focusGrace'] as int?) ?? 10).clamp(0, 300),
     activityAdjusted: j['activityAdjusted'] != false,
     trackingEnabled: j['trackingEnabled'] != false,
+    sidebarCollapsed: j['sidebarCollapsed'] == true,
+    startupEnabled: j['startupEnabled'] == true,
   );
 }

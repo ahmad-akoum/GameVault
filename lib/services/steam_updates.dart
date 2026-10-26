@@ -321,7 +321,7 @@ class SteamUpdateService {
     final queue = {
       ...roots,
       ...steamRoots,
-      ...games.where((g) => !g.isManual).map((g) => g.libraryPath),
+      ...games.where((g) => g.isSteam).map((g) => g.libraryPath),
     }.toList();
     final libraries = <String, String>{};
     for (var i = 0; i < queue.length; i++) {
@@ -360,7 +360,7 @@ class SteamUpdateService {
       }
     }
     final result = <int, SteamUpdateEvidence>{};
-    for (final game in games.where((g) => !g.isManual)) {
+    for (final game in games.where((g) => g.isSteam)) {
       final matches = <SteamUpdateEvidence>[];
       for (final library in libraries.values) {
         final file = await _read(

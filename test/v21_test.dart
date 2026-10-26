@@ -141,6 +141,7 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: AppVersionLabel()));
     await tester.pumpAndSettle();
     expect(find.text('GameVault 2.1.0'), findsOneWidget);
+    expect(find.textContaining('+3'), findsNothing);
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
           const MethodChannel('gamevault/windows'),

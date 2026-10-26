@@ -102,8 +102,19 @@ void main() {
       expect(tester.takeException(), isNull);
       await tester.tap(find.byIcon(Icons.tune));
       await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Appearance'),
+        100,
+        scrollable: find.byType(Scrollable).last,
+      );
       expect(find.text('Appearance'), findsOneWidget);
       expect(tester.takeException(), isNull);
+      await tester.scrollUntilVisible(
+        find.text('Light'),
+        100,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
       await tester.runAsync(() async {
         await tester.tap(find.text('Light'));
         await Future<void>.delayed(const Duration(milliseconds: 100));
