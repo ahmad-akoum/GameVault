@@ -12,8 +12,16 @@ timestamps used by Home. Unplayed games go last in both directions, with title
 ordering for ties. `library_pages.dart` owns the dropdowns; `vault_shell.dart`
 owns navigation. `VaultSettings.sidebarCollapsed` remembers manual collapse;
 small windows still use the automatic compact navigation/drawer. Settings uses
-the native executable version, including its build number. The obsolete V2
+the native executable version with build metadata hidden in the label. The EXE
+and package retain the full version; `AppVersionLabel.publicVersion` removes
+only the `+build` suffix, covered by unit and native-channel widget tests. The obsolete V2
 sidebar label is gone.
+
+The manual toggle is rendered only at widths of at least 1050 pixels, where
+expansion is supported. Previously it remained visible but disabled below that
+boundary. Resizing does not change the stored preference. The sidebar regression
+covers the 1049/1050 boundary, forced compact mode, drawer mode and both saved
+manual states; the existing responsive thresholds are unchanged.
 
 ## Sharing selected artwork
 

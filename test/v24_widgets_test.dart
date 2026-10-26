@@ -200,12 +200,41 @@ void main() {
       expect(find.byTooltip('My Library'), findsOneWidget);
       final snapshot = (await tester.runAsync(c.store.load))!;
       expect(snapshot.settings.sidebarCollapsed, true);
+      for (final width in [1049.0, 600.0]) {
+        tester.view.physicalSize = Size(width, 840);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('sidebarToggle')), findsNothing);
+        expect(c.settings.sidebarCollapsed, true);
+        expect(tester.takeException(), isNull);
+      }
       tester.view.physicalSize = const Size(360, 700);
       await tester.pumpAndSettle();
       expect(find.byTooltip('Open navigation'), findsOneWidget);
       await tester.tap(find.byTooltip('Open navigation'));
       await tester.pumpAndSettle();
       expect(find.text('My Library'), findsOneWidget);
+      expect(find.byKey(const ValueKey('sidebarToggle')), findsNothing);
+      tester.state<ScaffoldState>(find.byType(Scaffold).first).closeDrawer();
+      await tester.pumpAndSettle();
+      tester.view.physicalSize = const Size(1050, 840);
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('Expand navigation'), findsOneWidget);
+      await tester.runAsync(() async {
+        await tester.tap(find.byTooltip('Expand navigation'));
+        await waitUntil(() => !c.settings.sidebarCollapsed);
+      });
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('Collapse navigation'), findsOneWidget);
+      expect(
+        (await tester.runAsync(c.store.load))!.settings.sidebarCollapsed,
+        false,
+      );
+      tester.view.physicalSize = const Size(1049, 840);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('sidebarToggle')), findsNothing);
+      tester.view.physicalSize = const Size(1280, 840);
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('Collapse navigation'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
       await tester.runAsync(() async {

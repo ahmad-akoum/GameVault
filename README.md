@@ -15,7 +15,8 @@ update management. No automatic downloads are initiated.
 The current development branch prepares **V2.4.0 (candidate)**: shared selected
 artwork, update filtering, play-history sorting, sidebar collapse, cached storage
 details, guarded Windows startup settings, and experimental Epic discovery.
-It is awaiting owner acceptance; the stable download above remains V2.3.0.
+Candidate 2 has passed owner acceptance; final publication approval is pending.
+The stable download above remains V2.3.0.
 See [candidate notes](docs/releases/v2.4.0.md).
 
 ## Supported platform
@@ -71,7 +72,10 @@ Historical Steam hours and historical AFK time cannot be reconstructed. Monitori
 
 Windows high-refresh frame measurements and clean-machine installation remain unverified. The scrolling changes do not establish a measured 120/180 FPS result.
 
-Live HowLongToBeat website lookup, refresh and script inspection are disabled in this release pending an authorized integration. Previously saved estimates and saved matches remain available offline. This change does not by itself resolve every licensing question. Ratings remain reserved for V3.
+Live HowLongToBeat search, saved-match selection and refresh were restored in
+V2.3 and are retained in V2.4. This is an independent, unofficial integration;
+service availability and distribution permissions are not guaranteed. Existing
+saved values remain local. Ratings remain reserved for V3.
 
 ## Screenshots
 Screenshots of personal libraries are intentionally excluded. No private artwork cache or game/session database is distributed.

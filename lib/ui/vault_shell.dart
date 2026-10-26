@@ -71,10 +71,9 @@ class _VaultShellState extends State<VaultShell> {
       );
     }
     final narrow = MediaQuery.sizeOf(context).width < 600;
+    final canToggleSidebar = MediaQuery.sizeOf(context).width >= 1050;
     final compact =
-        !narrow &&
-        (MediaQuery.sizeOf(context).width < 1050 ||
-            c.settings.sidebarCollapsed);
+        !narrow && (!canToggleSidebar || c.settings.sidebarCollapsed);
     final content = detail != null
         ? DetailsPage(
             key: ValueKey(detail),
@@ -159,22 +158,18 @@ class _VaultShellState extends State<VaultShell> {
                                 ),
                               ),
                             ],
-                            if (!narrow)
+                            if (canToggleSidebar)
                               IconButton(
+                                key: const ValueKey('sidebarToggle'),
                                 tooltip: compact
-                                    ? (MediaQuery.sizeOf(context).width < 1050
-                                          ? 'Navigation expands in wider windows'
-                                          : 'Expand navigation')
+                                    ? 'Expand navigation'
                                     : 'Collapse navigation',
-                                onPressed:
-                                    MediaQuery.sizeOf(context).width < 1050
-                                    ? null
-                                    : () => c.setSettings(
-                                        c.settings.copy(
-                                          sidebarCollapsed:
-                                              !c.settings.sidebarCollapsed,
-                                        ),
-                                      ),
+                                onPressed: () => c.setSettings(
+                                  c.settings.copy(
+                                    sidebarCollapsed:
+                                        !c.settings.sidebarCollapsed,
+                                  ),
+                                ),
                                 icon: Icon(
                                   compact
                                       ? Icons.chevron_right

@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.4.0 — candidate (owner acceptance pending)
+## 2.4.0 — prepared (publication pending approval)
 
 ### Added
 - Preview and reuse selected cover/banner artwork across the two independent slots.
@@ -12,9 +12,12 @@
 
 ### Changed
 - Manual Steam folders are an optional fallback; Scan again remains on Find games.
-- Settings shows the executable's full version; obsolete V2 sidebar label removed.
+- Settings dynamically shows the public version without its internal build suffix;
+  executable/package metadata retains the full version. Obsolete V2 label removed.
 
 ### Fixed
+- Hide the sidebar arrow when responsive navigation cannot expand; retain its
+  saved manual preference across width changes.
 - Empty manual-folder settings no longer block automatic Steam registry/VDF discovery.
 
 ### Known limitations
