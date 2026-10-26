@@ -66,9 +66,12 @@ website access controls to restore it.
 
 ## V2.4 candidate and artifact locations
 
-V2.3.0+13 is the installed stable version. Develop V2.4 only in a new isolated
-candidate under `development_artifacts/candidates`, with a separately copied
-vault. Keep earlier artifacts and backups intact. Use the private build helper
+V2.4.0+17 is installed at the usual stable Release path, upgraded from the
+verified official-build package with the owner's latest personalized V2.4 vault.
+The owner has approved V2.4 publication and PR #23 merge. The complete V2.3 runtime/vault is
+preserved under `previous_versions/v2.3.0/Release` and in a private verified backup.
+Develop only in an isolated candidate under `development_artifacts/candidates`,
+with a separately copied vault. Keep earlier artifacts and backups intact. Use the private build helper
 with `-Candidate`; candidate startup-registration changes must stay disabled.
 The entire `development_artifacts` tree is private and Git-ignored, outside the
 disposable root build directory. Do not use it as a second source checkout.

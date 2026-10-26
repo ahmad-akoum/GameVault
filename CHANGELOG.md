@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.4.0 — prepared (publication pending approval)
+## 2.4.0
 
 ### Added
 - Preview and reuse selected cover/banner artwork across the two independent slots.
