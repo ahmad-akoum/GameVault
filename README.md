@@ -6,9 +6,9 @@ publishes a release automatically.
 
 A local-first Flutter Windows game library: discover installed games, choose what to import, launch them, and track new play sessions.
 
-**V2.4.0 - Library customization and experimental Epic Games support.**
+**V2.4.1 - Steam lifetime estimates and artwork positioning.**
 
-[Download the Windows release](https://github.com/ahmad-akoum/GameVault/releases/tag/v2.4.0).
+[Download the Windows release](https://github.com/ahmad-akoum/GameVault/releases/tag/v2.4.1).
 Play Game launches normally; Update Available opens the game in Steam for manual
 update management. No automatic downloads are initiated.
 
@@ -27,6 +27,8 @@ Windows x64 desktop. Flutter 3.38.5, Dart 3.10.4 and Visual Studio 2022 with Des
 - Steam/local executable launching and conservative process matching.
 - Installation refresh and folder actions across configured Steam libraries; conservative update-state badges and Open in Steam, with source/timestamp details and no automatic update downloads.
 - Independent vertical cover and widescreen profile-banner selection, local image import, preview, restore and supported Steam alternatives.
+- Steam local lifetime-playtime retrieval without API keys, automatic provisional estimates, explicit historical baseline/overlap adjustment and a compact Playtime Overview. Accepted baselines are preserved across cache refreshes.
+- Independent cover/banner crop positioning and zoom, Fit Entire Image and Fit with Blurred Background; original image files remain unchanged.
 - Total observed session time and activity-adjusted time; configurable 60-second idle and 10-second focus-loss defaults, session history and dashboard statistics.
 - Keyboard/mouse and existing XInput activity; standard DualSense Raw Input observation with drift/noise thresholds. Owner gameplay acceptance covered DualSense Bluetooth with Steam Input both enabled and disabled.
 - Dark, Light and System appearance; Cobalt, Crimson, Emerald, Amethyst, Obsidian and Midnight presets; separate accent/background/surface custom colors with preview. Surface hues adapt to mode for readable contrast.
@@ -55,10 +57,10 @@ flutter run -d windows
 The preparation script creates local plugin junctions where symlink privileges are unavailable. If dependency resolution reports missing symlink support, run the script then repeat pub get. Do not upgrade dependencies just to build this release.
 
 ```powershell
-$Build = Join-Path (Get-Location) 'development_artifacts\candidates\GameVaultV24Candidate2Build'
-$Symbols = Join-Path (Get-Location) 'development_artifacts\private_symbols\GameVaultV24Candidate2PrivateSymbols'
-.\scripts\build_private_release.ps1 -Version 2.4.0 -BuildDirectory $Build -SymbolDirectory $Symbols -Candidate
-python tool/package_release.py 2.4.0 --build-dir $Build --output-dir development_artifacts/release_artifacts/v2.4.0-candidate-2
+$Build = Join-Path (Get-Location) 'development_artifacts\candidates\GameVaultV241CandidateBuild'
+$Symbols = Join-Path (Get-Location) 'development_artifacts\private_symbols\GameVaultV241CandidateSymbols'
+.\scripts\build_private_release.ps1 -Version 2.4.1 -BuildDirectory $Build -SymbolDirectory $Symbols -Candidate
+python tool/package_release.py 2.4.1 --build-dir $Build --output-dir development_artifacts/release_artifacts/v2.4.1-candidate
 ```
 
 This builds a candidate with Windows startup registration disabled. Use a fresh output directory for each candidate and keep its copied vault isolated. The isolated build output is `$Build\windows\x64\runner\Release`. Packaging selects runtime files only and refuses to overwrite an existing versioned ZIP. Verify pubspec version and the executable's ProductVersion before packaging. See [developer guide](docs/DEVELOPMENT.md).
@@ -66,7 +68,7 @@ This builds a candidate with Windows startup registration disabled. Use a fresh 
 ## Privacy and limitations
 Data is stored in vault_data beside the executable, or the directory selected by GAMEVAULT_DATA_DIR. The application keeps no keystroke or controller-button history. Metadata services receive requests; local tracking is not an authenticated Steam account integration.
 
-Historical Steam hours and historical AFK time cannot be reconstructed. Monitoring needs GameVault to remain open. Two-second process sampling and 15-second checkpoints are approximate; recent unsaved time may be lost after a crash. Global activity is an estimate, so reading or cutscenes can be classified inactive. Protected processes and unusual launchers may need an explicit executable selection.
+Steam's local cache can supply historical runtime, which may contain AFK time. Full overlap is an assumption, not proof of lifetime active gameplay. Provisional estimates stay on profiles; Activity uses accepted estimates or measured active time. Missing/stale data and account changes require review. Historical AFK time cannot be reconstructed. Monitoring needs GameVault to remain open. Two-second process sampling and 15-second checkpoints are approximate; recent unsaved time may be lost after a crash. Global activity is an estimate, so reading or cutscenes can be classified inactive. Protected processes and unusual launchers may need an explicit executable selection.
 
 Windows high-refresh frame measurements and clean-machine installation remain unverified. The scrolling changes do not establish a measured 120/180 FPS result.
 
@@ -79,6 +81,7 @@ saved values remain local. Ratings remain reserved for V3.
 Screenshots of personal libraries are intentionally excluded. No private artwork cache or game/session database is distributed.
 
 ## Release documentation
+- [V2.4.1 release notes](docs/releases/v2.4.1.md)
 - [Changelog](CHANGELOG.md)
 - [V2.0 notes](docs/releases/v2.0.0.md)
 - [V2.1 notes](docs/releases/v2.1.0.md)

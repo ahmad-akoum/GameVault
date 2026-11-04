@@ -38,3 +38,9 @@ Windows Debug build and isolated startup/graceful shutdown passed for 2.2.0-dev.
 5. Try a corrupt image and unsupported format; verify a helpful error and unchanged selection. Use only the development copy to test missing managed files; verify the placeholder and recovery by importing/selecting another image.
 6. Check Compact/Comfortable/Expanded profiles, six presets/custom colors and Dark/Light/System. Hover the desktop window controls; no Overlay error should appear. Check preview zoom/close and dialog scrolling at smaller window sizes.
 7. During CONTROL or S.T.A.L.K.E.R. 2, observe library covers across tracking refreshes and Alt+Tab. Confirm stable images and continued Stage 1 idle/resume behavior. No game/controller configuration needs changing for artwork management.
+
+## V2.4.1 positioning and display modes
+
+Phase 4 adds independent crop position/zoom and Fit with Blurred Background to both
+slots, without editing image files. See [artwork presentation](artwork_presentation.md)
+for storage compatibility, renderer behavior and regression tests.

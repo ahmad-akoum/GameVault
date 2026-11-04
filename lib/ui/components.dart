@@ -1,12 +1,19 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../models/game.dart';
+import '../models/artwork_presentation.dart';
 import 'artwork_image.dart';
 import 'responsive.dart';
 import '../services/steam_updates.dart';
 import 'steam_update_indicator.dart';
 
 class GameArtwork extends StatelessWidget {
+  static final _backgroundBlur = ui.ImageFilter.blur(
+    sigmaX: 18,
+    sigmaY: 18,
+    tileMode: ui.TileMode.clamp,
+  );
   const GameArtwork({
     super.key,
     this.path,
@@ -14,11 +21,13 @@ class GameArtwork extends StatelessWidget {
     required this.title,
     this.fit = BoxFit.cover,
     this.fullResolution = false,
+    this.presentation,
   });
   final String? path, url;
   final String title;
   final BoxFit fit;
   final bool fullResolution;
+  final ArtworkPresentation? presentation;
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -67,7 +76,23 @@ class GameArtwork extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final dpr = MediaQuery.devicePixelRatioOf(context);
-        ImageProvider sized(ImageProvider source) {
+        final mode = presentation?.mode;
+        final fit = mode == ArtworkFit.contain || mode == ArtworkFit.blurred
+            ? BoxFit.contain
+            : mode == ArtworkFit.crop
+            ? BoxFit.cover
+            : this.fit;
+        final zoom = mode == ArtworkFit.crop
+            ? presentation!.zoom.clamp(1.0, 3.0)
+            : 1.0;
+        final alignment = mode == ArtworkFit.crop
+            ? Alignment(
+                presentation!.x.clamp(-1.0, 1.0),
+                presentation!.y.clamp(-1.0, 1.0),
+              )
+            : Alignment.center;
+        ImageProvider sized(ImageProvider source, {bool background = false}) {
+          if (background) return ArtworkImage(source, 256, 256, BoxFit.contain);
           if (fullResolution ||
               !constraints.hasBoundedWidth ||
               !constraints.hasBoundedHeight ||
@@ -77,27 +102,65 @@ class GameArtwork extends StatelessWidget {
           }
           return ArtworkImage(
             source,
-            artworkBucket(constraints.maxWidth * dpr),
-            artworkBucket(constraints.maxHeight * dpr),
+            artworkBucket(constraints.maxWidth * dpr * zoom),
+            artworkBucket(constraints.maxHeight * dpr * zoom),
             fit,
           );
         }
 
-        Widget remote() => url == null
-            ? fallback()
-            : Image(
-                image: sized(NetworkImage(url!)),
-                fit: fit,
-                filterQuality: FilterQuality.medium,
-                errorBuilder: (_, error, stack) => fallback(),
-              );
+        Widget render(ImageProvider source, Widget Function() failure) {
+          Widget image = Image(
+            image: sized(source),
+            fit: fit,
+            alignment: alignment,
+            filterQuality: FilterQuality.medium,
+            errorBuilder: (_, error, stack) => failure(),
+          );
+          if (mode == ArtworkFit.blurred &&
+              constraints.hasBoundedWidth &&
+              constraints.hasBoundedHeight) {
+            return RepaintBoundary(
+              child: ClipRect(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ImageFiltered(
+                      imageFilter: _backgroundBlur,
+                      child: Image(
+                        image: sized(source, background: true),
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, error, stack) =>
+                            ColoredBox(color: scheme.surfaceContainerHighest),
+                      ),
+                    ),
+                    ColoredBox(color: scheme.scrim.withValues(alpha: .18)),
+                    image,
+                  ],
+                ),
+              ),
+            );
+          }
+          if (zoom > 1 &&
+              constraints.hasBoundedWidth &&
+              constraints.hasBoundedHeight) {
+            image = ClipRect(
+              child: OverflowBox(
+                alignment: alignment,
+                minWidth: constraints.maxWidth * zoom,
+                maxWidth: constraints.maxWidth * zoom,
+                minHeight: constraints.maxHeight * zoom,
+                maxHeight: constraints.maxHeight * zoom,
+                child: image,
+              ),
+            );
+          }
+          return image;
+        }
+
+        Widget remote() =>
+            url == null ? fallback() : render(NetworkImage(url!), fallback);
         if (path == null) return remote();
-        return Image(
-          image: sized(FileImage(File(path!))),
-          fit: fit,
-          filterQuality: FilterQuality.medium,
-          errorBuilder: (_, error, stack) => remote(),
-        );
+        return render(FileImage(File(path!)), remote);
       },
     );
   }
@@ -255,6 +318,7 @@ class _GameTileState extends State<GameTile> {
                   borderRadius: BorderRadius.circular(12),
                   child: GameArtwork(
                     path: g.coverPath,
+                    presentation: g.artwork?.coverDisplay,
                     title: g.title,
                     fit: g.artwork?.coverContained == true
                         ? BoxFit.contain

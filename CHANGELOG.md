@@ -1,5 +1,58 @@
 # Changelog
 
+## 2.4.1
+
+### Added
+- Isolated Steam local-playtime provider with verified active-account proposals,
+  explicit confirmation API, AppID matching and separate versioned snapshots.
+- Missing/stale/error states and separately retained last-known values.
+- Snapshot-file privacy exclusions and parsing/account/persistence regressions.
+- Accepted, revisioned playtime baselines with explicit overlap evidence, manual
+  historical estimates and a separate combined-playtime calculation service.
+- Baseline previews revalidate account, source snapshot and tracked checkpoints;
+  refreshes never recalculate accepted history. Backup recovery is read-only to
+  prevent silently rolling accepted baseline revisions back.
+- Responsive Playtime Overview beneath the full-width profile banner, with
+  independent tracked totals, cached Steam lifetime, accepted historical
+  adjustment, provenance, freshness and refresh controls.
+- Explicit Steam account confirmation and historical setup: full/partial/zero
+  overlap, zero history and manual historical-only time, preview before acceptance,
+  and deliberate revision without changing earlier accepted records.
+
+### Changed
+- Activity-adjusted lifetime summaries and rankings use usable accepted estimates,
+  falling back to measured active time. Today, dated charts, session counts and
+  Recent Sessions continue to use real sessions. Total-session mode is unchanged.
+- Removed redundant inline profile totals; launch controls remain on the left,
+  overview on the right at wide sizes and stacked at narrow sizes.
+
+### Known limitations
+- Historical runtime can include unknown AFK time. Combined time is a profile-based
+  estimate, not verified lifetime active time or account-stamped session history.
+- Steam minute precision, cache age and synchronization delays limit accuracy.
+  Refreshes never import additional historical time without explicit reconciliation.
+- Missing/unverified accounts suppress combined estimates; unavailable Steam data
+  can use explicit manual history after account confirmation. Slot aspect ratios
+  still vary with profile layout; zoom cannot restore missing source detail.
+
+### UI and artwork refinements
+- Compact Playtime Overview with minute-rounded estimate, four rows, source/overlap
+  footer, Adjust and information dialog; actionable warnings stay visible.
+- Automatic, memory-only provisional full-overlap estimates for verified active
+  Steam accounts without accepted history. Activity excludes provisional estimates;
+  accepted/manual adjustments remain unchanged by refreshes.
+- Coalesced refresh requests, five-minute automatic cache interval and quiet,
+  separate minute-level identity checks; cache indicators reflect actual work.
+- Independent cover/banner crop position and zoom, Fit Entire Image, and Fit with
+  Blurred Background using the original image without recompression or replacement.
+- Additive artwork preference persistence retains legacy fit behavior and originals.
+
+### Release
+- Windows x64 portable release, public version 2.4.1, internal build 2.4.1+20.
+- Final headline uses Estimated / Provisional labels, a rounded Adjust button and
+  source-specific overlap/history footers. Technical information stays accessible.
+- No automatic upgrade or migration of an existing installation is performed.
+
 ## 2.4.0
 
 ### Added

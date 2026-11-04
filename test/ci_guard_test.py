@@ -18,6 +18,9 @@ class PrivacyGuardTests(unittest.TestCase):
             self.assertFalse(guard.private_name(name), name)
         self.assertFalse(guard.private_name('gamevault.exe', runtime=True))
         self.assertTrue(guard.private_name('gamevault.pdb', runtime=True))
+        for name in ['steam_playtime.json', 'steam_playtime.json.bak', 'steam_playtime.json.lock', 'steam_playtime.json.pending.123.1']:
+            self.assertTrue(guard.private_name(name), name)
+            self.assertTrue(guard.private_name(name, runtime=True), name)
 
     def test_credentials_are_flagged_without_logging_values(self):
         self.assertTrue(guard.sensitive(('ghp_' + 'x' * 36).encode()))

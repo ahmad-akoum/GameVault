@@ -12,6 +12,9 @@ import 'services/windows_games.dart';
 import 'services/epic_scanner.dart';
 import 'services/installed_storage.dart';
 import 'services/windows_startup.dart';
+import 'services/steam_local_playtime.dart';
+import 'services/steam_playtime_service.dart';
+import 'services/steam_playtime_store.dart';
 import 'state/vault_controller.dart';
 import 'ui/theme.dart';
 import 'ui/vault_shell.dart';
@@ -52,6 +55,10 @@ Future<void> main() async {
       File(p.join(store.directory.path, 'storage_cache.json')),
     ),
     startup: WindowsStartup(),
+    steamPlaytime: SteamPlaytimeService(
+      SteamLocalPlaytimeProvider(),
+      SteamPlaytimeStore(directory),
+    ),
   );
   runApp(GameVaultApp(controller: controller));
   await controller.initialize();

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import '../services/artwork_store.dart';
 import '../models/game.dart';
+import '../models/artwork_presentation.dart';
 import '../state/vault_controller.dart';
 import 'components.dart';
 import 'artwork_viewer.dart';
@@ -16,7 +17,9 @@ class ArtworkManager extends StatefulWidget {
 }
 
 class _ArtworkManagerState extends State<ArtworkManager> {
-  bool cover = true, contained = false, busy = false;
+  bool cover = true, busy = false;
+  ArtworkPresentation layout = const ArtworkPresentation();
+  bool get contained => layout.mode == ArtworkFit.contain;
   String? draft, message;
   final additions = <bool, List<String>>{true: [], false: []};
   late final store = ArtworkStore(widget.controller.store.artwork);
@@ -50,9 +53,9 @@ class _ArtworkManagerState extends State<ArtworkManager> {
 
   void reset() {
     draft = selected;
-    contained =
-        (cover ? game.artwork?.coverContained : game.artwork?.heroContained) ??
-        false;
+    layout =
+        (cover ? game.artwork?.coverDisplay : game.artwork?.heroDisplay) ??
+        const ArtworkPresentation();
     message = null;
   }
 
@@ -106,6 +109,7 @@ class _ArtworkManagerState extends State<ArtworkManager> {
       cover: cover,
       path: draft,
       contained: contained,
+      presentation: layout,
       choices: choices,
     );
     if (mounted) {
@@ -142,6 +146,33 @@ class _ArtworkManagerState extends State<ArtworkManager> {
       });
     }
   });
+  Widget cropSlider(
+    String label,
+    double value,
+    double min,
+    double max,
+    ArtworkPresentation Function(double) update,
+  ) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        label == 'Zoom'
+            ? '$label: ${value.toStringAsFixed(1)}x'
+            : '$label: ${((value + 1) * 50).round()}%',
+      ),
+      Slider(
+        key: ValueKey(label),
+        value: value,
+        min: min,
+        max: max,
+        divisions: 20,
+        label: label == 'Zoom'
+            ? '${value.toStringAsFixed(1)}x'
+            : '${((value + 1) * 50).round()}%',
+        onChanged: busy ? null : (v) => setState(() => layout = update(v)),
+      ),
+    ],
+  );
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -165,6 +196,9 @@ class _ArtworkManagerState extends State<ArtworkManager> {
                 color: scheme.surfaceContainerHighest,
                 child: GameArtwork(
                   path: isCover ? game.coverPath : game.profileArtworkPath,
+                  presentation: isCover
+                      ? game.artwork?.coverDisplay
+                      : game.artwork?.heroDisplay,
                   title: 'No artwork',
                   fit:
                       (isCover
@@ -253,6 +287,7 @@ class _ArtworkManagerState extends State<ArtworkManager> {
                                 color: scheme.surfaceContainerHighest,
                                 child: GameArtwork(
                                   path: draft,
+                                  presentation: layout,
                                   title: 'No artwork selected',
                                   fit: contained
                                       ? BoxFit.contain
@@ -268,20 +303,21 @@ class _ArtworkManagerState extends State<ArtworkManager> {
                           runSpacing: 12,
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
-                            ChoiceChip(
-                              label: const Text('Crop to fill'),
-                              selected: !contained,
-                              onSelected: busy
-                                  ? null
-                                  : (_) => setState(() => contained = false),
-                            ),
-                            ChoiceChip(
-                              label: const Text('Fit entire image'),
-                              selected: contained,
-                              onSelected: busy
-                                  ? null
-                                  : (_) => setState(() => contained = true),
-                            ),
+                            for (final mode in ArtworkFit.values)
+                              ChoiceChip(
+                                label: Text(switch (mode) {
+                                  ArtworkFit.crop => 'Crop to fill',
+                                  ArtworkFit.contain => 'Fit entire image',
+                                  ArtworkFit.blurred =>
+                                    'Fit with blurred background',
+                                }),
+                                selected: layout.mode == mode,
+                                onSelected: busy
+                                    ? null
+                                    : (_) => setState(
+                                        () => layout = layout.copy(mode: mode),
+                                      ),
+                              ),
                             TextButton.icon(
                               icon: const Icon(Icons.fullscreen),
                               label: const Text('Enlarge preview'),
@@ -298,6 +334,50 @@ class _ArtworkManagerState extends State<ArtworkManager> {
                           ],
                         ),
                         const SizedBox(height: 12),
+                        if (layout.mode == ArtworkFit.crop) ...[
+                          cropSlider(
+                            'Horizontal position',
+                            layout.x,
+                            -1,
+                            1,
+                            (v) => layout.copy(x: v),
+                          ),
+                          cropSlider(
+                            'Vertical position',
+                            layout.y,
+                            -1,
+                            1,
+                            (v) => layout.copy(y: v),
+                          ),
+                          cropSlider(
+                            'Zoom',
+                            layout.zoom,
+                            1,
+                            3,
+                            (v) => layout.copy(zoom: v),
+                          ),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton.icon(
+                              onPressed: busy
+                                  ? null
+                                  : () => setState(
+                                      () =>
+                                          layout = const ArtworkPresentation(),
+                                    ),
+                              icon: const Icon(
+                                Icons.center_focus_strong,
+                                size: 18,
+                              ),
+                              label: const Text('Reset position and zoom'),
+                            ),
+                          ),
+                          const Text(
+                            'Position affects cropped edges. Zoom only applies to Crop to fill.',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
                         Text(
                           'Choose an image to preview',
                           style: Theme.of(context).textTheme.titleSmall,
@@ -404,7 +484,7 @@ class _ArtworkManagerState extends State<ArtworkManager> {
                                   ? null
                                   : () => setState(() {
                                       draft = original;
-                                      contained = false;
+                                      layout = const ArtworkPresentation();
                                       message =
                                           'Default preview ready. Apply to restore only this artwork.';
                                     }),

@@ -9,6 +9,7 @@ import 'appearance_controls.dart';
 import 'artwork_viewer.dart';
 import 'artwork_manager.dart';
 import 'activity_pages.dart';
+import 'playtime_overview.dart';
 import '../services/steam_installation.dart';
 import '../services/steam_updates.dart';
 import 'steam_update_indicator.dart';
@@ -44,6 +45,7 @@ class _DetailsPageState extends State<DetailsPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         widget.controller.checkInstallation(widget.id);
+        widget.controller.refreshPlaytime(refresh: true, automatic: true);
         if (widget.controller.platform != null) {
           widget.controller.refreshSteamUpdates();
         }
@@ -62,6 +64,11 @@ class _DetailsPageState extends State<DetailsPage> {
           widget.controller.game(widget.id)?.title ??
           '';
       widget.controller.checkInstallation(widget.id);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          widget.controller.refreshPlaytime(refresh: true, automatic: true);
+        }
+      });
     }
   }
 
@@ -142,6 +149,7 @@ class _DetailsPageState extends State<DetailsPage> {
                   label: 'Enlarge artwork',
                   child: GameArtwork(
                     path: g.profileArtworkPath,
+                    presentation: g.artwork?.heroDisplay,
                     fit: g.artwork?.heroContained == true
                         ? BoxFit.contain
                         : BoxFit.cover,
@@ -153,62 +161,91 @@ class _DetailsPageState extends State<DetailsPage> {
           ),
         ),
         SizedBox(height: gap),
-        Text(g.title, style: Theme.of(context).textTheme.headlineLarge),
-        const SizedBox(height: 8),
-        Text(
-          [
-            g.sourceLabel,
-            'Windows',
-            if (g.release != null) g.release!,
-            ...g.genres,
-          ].join('  •  '),
-          style: TextStyle(color: scheme.onSurfaceVariant),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final details = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(g.title, style: Theme.of(context).textTheme.headlineLarge),
+                const SizedBox(height: 8),
+                Text(
+                  [
+                    g.sourceLabel,
+                    'Windows',
+                    if (g.release != null) g.release!,
+                    ...g.genres,
+                  ].join('  •  '),
+                  style: TextStyle(color: scheme.onSurfaceVariant),
+                ),
+                SizedBox(height: gap),
+                TrackingControls(controller: c, game: g),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (!g.isManual)
+                      OutlinedButton.icon(
+                        onPressed: () =>
+                            c.openGameLocation(g.appId, steam: true),
+                        icon: const Icon(Icons.open_in_new, size: 18),
+                        label: Text(
+                          g.isEpic ? 'Open Epic Library' : 'Open in Steam',
+                        ),
+                      ),
+                    OutlinedButton.icon(
+                      onPressed: () => c.openGameLocation(g.appId),
+                      icon: const Icon(Icons.folder_open, size: 18),
+                      label: const Text('Open File Location'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      'Installed size: ${c.sizing.contains(g.appId) ? 'Calculating…' : storageSize(c.storage[g.appId]?.bytes)}',
+                    ),
+                    Text(
+                      'Drive: ${c.storage[g.appId]?.drive ?? InstalledStorage(g.installPath, null, DateTime(1970)).drive}',
+                    ),
+                    TextButton.icon(
+                      onPressed: c.sizing.contains(g.appId)
+                          ? null
+                          : () => c.refreshStorage(g.appId, force: true),
+                      icon: const Icon(Icons.refresh, size: 16),
+                      label: const Text('Refresh storage'),
+                    ),
+                  ],
+                ),
+                if (c.storage[g.appId]?.message != null &&
+                    c.storage[g.appId]?.message !=
+                        'Logical installed file size; links are excluded.')
+                  Text(
+                    c.storage[g.appId]!.message!,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+              ],
+            );
+            final overview = PlaytimeOverview(controller: c, game: g);
+            if (constraints.maxWidth < 820) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [details, const SizedBox(height: 20), overview],
+              );
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 5, child: details),
+                const SizedBox(width: 24),
+                Expanded(flex: 4, child: overview),
+              ],
+            );
+          },
         ),
-        SizedBox(height: gap),
-        TrackingControls(controller: c, game: g),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            if (!g.isManual)
-              OutlinedButton.icon(
-                onPressed: () => c.openGameLocation(g.appId, steam: true),
-                icon: const Icon(Icons.open_in_new, size: 18),
-                label: Text(g.isEpic ? 'Open Epic Library' : 'Open in Steam'),
-              ),
-            OutlinedButton.icon(
-              onPressed: () => c.openGameLocation(g.appId),
-              icon: const Icon(Icons.folder_open, size: 18),
-              label: const Text('Open File Location'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Wrap(
-          spacing: 12,
-          runSpacing: 8,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            Text(
-              'Installed size: ${c.sizing.contains(g.appId) ? 'Calculating…' : storageSize(c.storage[g.appId]?.bytes)}',
-            ),
-            Text(
-              'Drive: ${c.storage[g.appId]?.drive ?? InstalledStorage(g.installPath, null, DateTime(1970)).drive}',
-            ),
-            TextButton.icon(
-              onPressed: c.sizing.contains(g.appId)
-                  ? null
-                  : () => c.refreshStorage(g.appId, force: true),
-              icon: const Icon(Icons.refresh, size: 16),
-              label: const Text('Refresh storage'),
-            ),
-          ],
-        ),
-        if (c.storage[g.appId]?.message != null)
-          Text(
-            c.storage[g.appId]!.message!,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
         SizedBox(height: gap),
         const SectionTitle('Recent sessions'),
         if (!c.tracker.sessions.any((s) => s.gameId == g.appId))
