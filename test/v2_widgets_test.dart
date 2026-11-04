@@ -140,7 +140,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(
-        find.text('Total 0s  •  Active 0s  •  Inactive 0s'),
+        find.text('Playtime Overview'),
         findsOneWidget,
       );
       expect(tester.takeException(), isNull);

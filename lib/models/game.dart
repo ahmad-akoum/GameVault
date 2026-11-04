@@ -1,3 +1,5 @@
+import 'artwork_presentation.dart';
+
 enum AppearanceMode { dark, light, system }
 
 enum GameSource { steam, local, epic }
@@ -118,10 +120,23 @@ class ArtworkPreferences {
     this.heroChosen = false,
     this.coverContained = false,
     this.heroContained = false,
+    this.coverLayout,
+    this.heroLayout,
   });
   final String? originalCover, originalHero;
   final List<String> covers, heroes;
   final bool coverContained, heroContained, coverChosen, heroChosen;
+  final ArtworkPresentation? coverLayout, heroLayout;
+  ArtworkPresentation get coverDisplay =>
+      coverLayout ??
+      ArtworkPresentation(
+        mode: coverContained ? ArtworkFit.contain : ArtworkFit.crop,
+      );
+  ArtworkPresentation get heroDisplay =>
+      heroLayout ??
+      ArtworkPresentation(
+        mode: heroContained ? ArtworkFit.contain : ArtworkFit.crop,
+      );
   Map<String, dynamic> toJson() => {
     'originalCover': originalCover,
     'originalHero': originalHero,
@@ -131,6 +146,8 @@ class ArtworkPreferences {
     'heroChosen': heroChosen,
     'coverContained': coverContained,
     'heroContained': heroContained,
+    if (coverLayout != null) 'coverLayout': coverLayout!.toJson(),
+    if (heroLayout != null) 'heroLayout': heroLayout!.toJson(),
   };
   factory ArtworkPreferences.fromJson(Map<String, dynamic> j) =>
       ArtworkPreferences(
@@ -142,6 +159,16 @@ class ArtworkPreferences {
         heroChosen: j['heroChosen'] == true,
         coverContained: j['coverContained'] == true,
         heroContained: j['heroContained'] == true,
+        coverLayout: j['coverLayout'] is Map
+            ? ArtworkPresentation.fromJson(
+                Map<String, dynamic>.from(j['coverLayout']),
+              )
+            : null,
+        heroLayout: j['heroLayout'] is Map
+            ? ArtworkPresentation.fromJson(
+                Map<String, dynamic>.from(j['heroLayout']),
+              )
+            : null,
       );
 }
 

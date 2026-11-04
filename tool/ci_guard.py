@@ -22,7 +22,7 @@ def private_name(name, runtime=False):
     parts = set(path.parts)
     if PRIVATE_PARTS & parts or '..' in parts or path.is_absolute():
         return True
-    if path.name.startswith('vault.json') or path.name == 'vault.lock':
+    if path.name.startswith(('vault.json', 'steam_playtime.json')) or path.name == 'vault.lock':
         return True
     if path.name == '.env' or (path.name.startswith('.env.') and path.name != '.env.example'):
         return True

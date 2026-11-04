@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import '../models/game.dart';
+import '../models/artwork_presentation.dart';
 import '../services/local_store.dart';
 import '../services/steam_scanner.dart';
 import '../services/steam_installation.dart';
@@ -14,6 +15,8 @@ import '../services/session_tracker.dart';
 import '../services/epic_scanner.dart';
 import '../services/installed_storage.dart';
 import '../services/windows_startup.dart';
+import '../services/steam_playtime_service.dart';
+import 'playtime_overview_controller.dart';
 
 class VaultController extends ChangeNotifier {
   VaultController({
@@ -25,7 +28,42 @@ class VaultController extends ChangeNotifier {
     this.epicScanner,
     this.storageService,
     this.startup,
-  });
+    SteamPlaytimeService? steamPlaytime,
+  }) : playtime = steamPlaytime == null
+           ? null
+           : PlaytimeOverviewController(steamPlaytime) {
+    playtime?.addListener(_playtimeChanged);
+  }
+  final PlaytimeOverviewController? playtime;
+  Timer? _playtimeMonitor;
+  void _playtimeChanged() {
+    if (!_closing) notifyListeners();
+  }
+
+  Iterable<int> get steamAppIds =>
+      games.where((g) => g.isSteam).map((g) => g.appId);
+  Future<void> refreshPlaytime({
+    bool refresh = false,
+    bool automatic = false,
+  }) async {
+    if (!_closing && !storageBlocked) {
+      await playtime?.load(steamAppIds, refresh: refresh, automatic: automatic);
+    }
+  }
+
+  /// Lifetime views only. Never used by SessionTracker or dated Activity data.
+  int lifetimePlayed(int id) =>
+      settings.activityAdjusted && game(id)?.isSteam == true
+      ? playtime?.estimate(id, tracker.sessions).combinedSeconds ?? played(id)
+      : played(id);
+  bool get hasCombinedPlaytime =>
+      settings.activityAdjusted &&
+      games.any(
+        (g) =>
+            g.isSteam &&
+            playtime?.estimate(g.appId, tracker.sessions).combinedSeconds !=
+                null,
+      );
   final LocalStore store;
   final SteamScanner scanner;
   final GameMetadataProvider metadata;
@@ -321,6 +359,13 @@ class VaultController extends ChangeNotifier {
       storageBlocked = true;
     }
     initialized = true;
+    if (!storageBlocked && playtime != null) {
+      unawaited(refreshPlaytime(refresh: true, automatic: true));
+      _playtimeMonitor = Timer.periodic(
+        const Duration(seconds: 60),
+        (_) => refreshPlaytime(refresh: true, automatic: true),
+      );
+    }
     if (!storageBlocked) unawaited(refreshStartup());
     if (!storageBlocked && platform != null) {
       _clock.start();
@@ -524,6 +569,7 @@ class VaultController extends ChangeNotifier {
     required bool cover,
     required String? path,
     required bool contained,
+    ArtworkPresentation? presentation,
     List<String> choices = const [],
   }) async {
     var saved = false;
@@ -547,8 +593,26 @@ class VaultController extends ChangeNotifier {
         heroes: cover
             ? old.heroes
             : {...old.heroes, ...choices, ?path}.toList(),
-        coverContained: cover ? contained : old.coverContained,
-        heroContained: cover ? old.heroContained : contained,
+        coverContained: cover
+            ? (presentation?.mode == ArtworkFit.contain ||
+                  presentation == null && contained)
+            : old.coverContained,
+        heroContained: cover
+            ? old.heroContained
+            : (presentation?.mode == ArtworkFit.contain ||
+                  presentation == null && contained),
+        coverLayout: cover
+            ? presentation ??
+                  ArtworkPresentation(
+                    mode: contained ? ArtworkFit.contain : ArtworkFit.crop,
+                  )
+            : old.coverLayout,
+        heroLayout: cover
+            ? old.heroLayout
+            : presentation ??
+                  ArtworkPresentation(
+                    mode: contained ? ArtworkFit.contain : ArtworkFit.crop,
+                  ),
       );
       final changed = g.copy(
         artwork: preferences,
@@ -812,6 +876,9 @@ class VaultController extends ChangeNotifier {
 
   Future<void> shutdown() async {
     _closing = true;
+    _playtimeMonitor?.cancel();
+    await playtime?.close();
+    playtime?.removeListener(_playtimeChanged);
     _monitor?.cancel();
     _updateMonitor?.cancel();
     await _updatePoll;

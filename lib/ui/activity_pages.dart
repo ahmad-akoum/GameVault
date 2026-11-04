@@ -13,11 +13,17 @@ class ActivitySummary extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = controller;
     final sessions = c.tracker.sessions;
-    final total = sessions.fold<int>(
+    final trackedTotal = sessions.fold<int>(
       0,
       (sum, s) =>
           sum + (c.settings.activityAdjusted ? s.activeSeconds : s.seconds),
     );
+    final total =
+        trackedTotal +
+        c.games.fold<int>(
+          0,
+          (sum, g) => sum + c.lifetimePlayed(g.appId) - c.played(g.appId),
+        );
     final today = dateKey(DateTime.now());
     final todayTime = sessions.fold<int>(
       0,
@@ -29,7 +35,9 @@ class ActivitySummary extends StatelessWidget {
         c.settings.activityAdjusted && hasUnknownActivity(sessions);
     final values = [
       (
-        c.settings.activityAdjusted ? 'ACTIVE PLAYTIME' : 'TOTAL SESSION TIME',
+        c.settings.activityAdjusted
+            ? (c.hasCombinedPlaytime ? 'LIFETIME ESTIMATE' : 'ACTIVE PLAYTIME')
+            : 'TOTAL SESSION TIME',
         unavailable ? 'Unknown' : sessionDuration(total),
         Icons.schedule,
       ),
@@ -140,8 +148,11 @@ class _StatisticsPageState extends State<StatisticsPage> {
         )
         .toList();
     final peak = math.max(1, totals.reduce(math.max));
-    final ranked = c.games.where((g) => c.played(g.appId) > 0).toList()
-      ..sort((a, b) => c.played(b.appId).compareTo(c.played(a.appId)));
+    final ranked = c.games.where((g) => c.lifetimePlayed(g.appId) > 0).toList()
+      ..sort(
+        (a, b) =>
+            c.lifetimePlayed(b.appId).compareTo(c.lifetimePlayed(a.appId)),
+      );
     return ListView(
       children: [
         PageHeading(
@@ -151,6 +162,13 @@ class _StatisticsPageState extends State<StatisticsPage> {
               : 'Showing total session time • Includes active and inactive periods',
         ),
         ActivitySummary(controller: c),
+        if (active)
+          const Padding(
+            padding: EdgeInsets.only(top: 12),
+            child: Text(
+              'Lifetime summaries and rankings use accepted profile estimates where usable, otherwise measured GameVault active time. Historical estimates may include AFK time. Provisional profile estimates are excluded until accepted. Today, charts and sessions below contain recorded activity only.',
+            ),
+          ),
         if (hasUnknownActivity(c.tracker.sessions))
           const Padding(
             padding: EdgeInsets.only(top: 12),
@@ -294,7 +312,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
                               sessions.where((s) => s.gameId == g.appId),
                             )
                         ? 'Unknown'
-                        : sessionDuration(c.played(g.appId)),
+                        : sessionDuration(c.lifetimePlayed(g.appId)),
                   );
                   return ListTile(
                     contentPadding: EdgeInsets.zero,
@@ -304,7 +322,27 @@ class _StatisticsPageState extends State<StatisticsPage> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    subtitle: constraints.maxWidth < 600 ? duration : null,
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          active &&
+                                  c.game(g.appId)?.isSteam == true &&
+                                  c.playtime
+                                          ?.estimate(
+                                            g.appId,
+                                            c.tracker.sessions,
+                                          )
+                                          .combinedSeconds !=
+                                      null
+                              ? 'Accepted lifetime estimate'
+                              : active
+                              ? 'GameVault measured active'
+                              : 'Tracked total runtime',
+                        ),
+                        if (constraints.maxWidth < 600) duration,
+                      ],
+                    ),
                     trailing: constraints.maxWidth >= 600 ? duration : null,
                     onTap: () => widget.onOpen(g),
                   );

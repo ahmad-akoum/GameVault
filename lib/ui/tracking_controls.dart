@@ -5,7 +5,6 @@ import '../state/vault_controller.dart';
 
 import 'components.dart';
 import 'collections_page.dart';
-import 'session_presentation.dart';
 import 'steam_update_indicator.dart';
 
 enum TrackingSection { summary, progress, settings }
@@ -24,11 +23,6 @@ class TrackingControls extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = controller, g = game;
     final update = g.isSteam ? c.steamUpdates[g.appId] : null;
-    final unknown = hasUnknownActivity(
-      c.tracker.sessions.where((s) => s.gameId == g.appId),
-    );
-    final total = c.tracker.total(g.appId),
-        active = c.tracker.total(g.appId, active: true);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -53,9 +47,6 @@ class TrackingControls extends StatelessWidget {
                   icon: const Icon(Icons.play_arrow),
                   label: const Text('Play Game'),
                 ),
-              Text(
-                'Total ${sessionDuration(total)}  •  Active ${unknown ? 'Unknown' : sessionDuration(active)}  •  Inactive ${unknown ? 'Unknown' : sessionDuration(total - active)}',
-              ),
             ],
           ),
           if (update?.badge != null) ...[
@@ -80,10 +71,6 @@ class TrackingControls extends StatelessWidget {
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 10),
-          Text(
-            'Tracked while GameVault is open. Historical Steam hours are separate and are not imported.',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
         ],
         if (section == TrackingSection.settings) ...[
           ExpansionTile(
