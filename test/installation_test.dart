@@ -231,6 +231,30 @@ void main() {
     );
   });
 
+  test(
+    'partial Steam installation stays unknown until a completed manifest',
+    () async {
+      final root = p.join(temp.path, 'Steam');
+      await installed(root);
+      final file = File(p.join(root, 'steamapps', 'appmanifest_1.acf'));
+      final service = SteamInstallation(
+        SteamScanner(installationRoots: () async => [root]),
+      );
+      await file.writeAsString(
+        '"AppState" { "appid" "1" "installdir" "Example" "buildid" "0" "stateflags" "260" }',
+      );
+      expect(
+        (await service.inspect(game(root), [])).status,
+        InstallationStatus.unknown,
+      );
+      await installed(root);
+      expect(
+        (await service.inspect(game(root), [])).status,
+        InstallationStatus.installed,
+      );
+    },
+  );
+
   testWidgets(
     'cancel closes the named uninstall confirmation without dispatch',
     (tester) async {

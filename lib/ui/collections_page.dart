@@ -237,6 +237,7 @@ class _CollectionsPageState extends State<CollectionsPage> {
                   ),
                 )
               : VaultGrid(
+                  installations: c.installations,
                   updates: c.steamUpdates,
                   games: games,
                   onOpen: widget.onOpen,

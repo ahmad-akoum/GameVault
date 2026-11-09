@@ -13,6 +13,7 @@
 ### Fixed
 - Recognize a completed Steam uninstall when a stale library index still lists the game.
 - Show a neutral confirmation and a separate storage group for verified uninstalled games.
+- Refresh the open Steam profile automatically and show a Not Installed badge on library and collection covers.
 
 ## 2.5.0
 

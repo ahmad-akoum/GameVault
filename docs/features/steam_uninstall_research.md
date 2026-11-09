@@ -93,3 +93,12 @@ Storage Overview rechecks the installation and groups verified uninstalled
 games separately from unavailable locations. Those games have no measured
 size and do not count as failed measurements. Refreshing after reinstall
 returns the game to its drive group. Fixture coverage checks both states.
+
+Candidate 5 checks the open Steam profile on focus return and at most once
+every 12 seconds while GameVault is focused. Those checks read Steam
+metadata, with storage recalculated on a verified reinstall. A one-time
+metadata pass seeds cover badges on startup. The shared game cards show
+verified Not Installed in the existing badge slot and preserve personal
+statuses. Unfinished installs remain inconclusive, and the old timeout
+message has been removed. Fixture tests cover focus return, an open-window
+transition, incomplete manifests and shared card badge precedence.

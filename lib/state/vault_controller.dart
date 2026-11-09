@@ -297,6 +297,7 @@ class VaultController extends ChangeNotifier {
       }
       final previous = installations[id]?.status;
       installations[id] = evidence;
+      if (previous != evidence.status) installationNotice = null;
       if (evidence.status == InstallationStatus.missing) storage.remove(id);
       notifyListeners();
       if (evidence.status == InstallationStatus.needsRefresh && g.isSteam) {
@@ -375,11 +376,6 @@ class VaultController extends ChangeNotifier {
       }
       if (_closing || game(id) != g) return false;
       await WindowsGames.requestSteamInstallation(id, uninstall: uninstall);
-      if (!_closing) {
-        error = uninstall
-            ? 'Uninstall request sent to Steam. Complete or cancel it there. GameVault will check the installation again.'
-            : 'Install request sent to Steam. Complete it there, then refresh the installation if needed.';
-      }
       return true;
     } catch (_) {
       if (!_closing) {
@@ -439,10 +435,10 @@ class VaultController extends ChangeNotifier {
         error = null;
         installationNotice = 'Installation status confirmed: Not Installed.';
       } else if (feedback) {
-        installationNotice = null;
-        error = evidence.installPath != null
-            ? 'Installation refreshed. Tracking executable selection preserved.'
-            : evidence.message;
+        installationNotice = evidence.installPath != null
+            ? 'Installation status confirmed: Installed.'
+            : null;
+        error = evidence.installPath != null ? null : evidence.message;
         final selected = game(id)?.executablePath;
         if (selected != null && !await File(selected).exists()) {
           error =
@@ -525,6 +521,7 @@ class VaultController extends ChangeNotifier {
     }
     if (!storageBlocked) unawaited(refreshStartup());
     if (!storageBlocked && platform != null) {
+      if (platform is WindowsGames) unawaited(_loadInstallationBadges());
       _clock.start();
       _monitor = Timer.periodic(const Duration(seconds: 2), (_) => pollGames());
       unawaited(refreshSteamUpdates());
@@ -534,6 +531,29 @@ class VaultController extends ChangeNotifier {
       );
     }
     notifyListeners();
+  }
+
+  Future<void> _loadInstallationBadges() async {
+    final service = SteamInstallation(scanner);
+    try {
+      final roots = await scanner.installationRoots();
+      for (final g in List.of(games)) {
+        if (_closing) return;
+        if (!g.isSteam || installations.containsKey(g.appId)) continue;
+        final evidence = await service.inspect(
+          g,
+          settings.paths,
+          discoveredSteamRoots: roots,
+        );
+        if (_closing) return;
+        if (game(g.appId) == g && !installations.containsKey(g.appId)) {
+          installations[g.appId] = evidence;
+          if (evidence.status == InstallationStatus.missing) notifyListeners();
+        }
+      }
+    } catch (_) {
+      // Badges remain absent when Steam records cannot be read.
+    }
   }
 
   Future<bool> _commit(List<VaultGame> next, VaultSettings nextSettings) async {

@@ -36,7 +36,13 @@ class _DetailsPageState extends State<DetailsPage> {
   late final TextEditingController query;
   late final AppLifecycleListener _lifecycle;
   Timer? _steamCheckTimer;
-  String? _steamRequestStatus;
+  void _checkSteamInstallation() {
+    if (widget.controller.game(widget.id)?.isSteam == true) {
+      unawaited(
+        widget.controller.checkInstallation(widget.id, refreshSize: false),
+      );
+    }
+  }
 
   Future<void> _manageSteam(VaultGame game, {required bool uninstall}) async {
     if (uninstall) {
@@ -61,51 +67,21 @@ class _DetailsPageState extends State<DetailsPage> {
       );
       if (confirmed != true || !mounted || widget.id != game.appId) return;
     }
-    final c = widget.controller;
-    final id = game.appId;
-    if (!await c.requestSteamInstallation(id, uninstall: uninstall) ||
-        !mounted ||
-        widget.id != id) {
-      return;
-    }
-    _steamCheckTimer?.cancel();
-    setState(
-      () => _steamRequestStatus = 'Checking Steam for an installation change…',
+    await widget.controller.requestSteamInstallation(
+      game.appId,
+      uninstall: uninstall,
     );
-    _steamCheckTimer = Timer.periodic(const Duration(seconds: 4), (
-      timer,
-    ) async {
-      final lastCheck = timer.tick == 8;
-      if (lastCheck) timer.cancel();
-      await c.checkInstallation(id, refreshSize: false);
-      if (!mounted || widget.id != id || _steamCheckTimer != timer) return;
-      final evidence = c.installations[id];
-      final changed = uninstall
-          ? evidence?.status == InstallationStatus.missing
-          : evidence?.installPath != null;
-      if (changed || lastCheck) {
-        timer.cancel();
-        setState(
-          () => _steamRequestStatus = changed
-              ? null
-              : 'Steam has not confirmed a change. If you completed the action, use Refresh Installation.',
-        );
-      }
-    });
   }
 
   @override
   void initState() {
     super.initState();
-    _lifecycle = AppLifecycleListener(
-      onResume: () {
-        if (widget.controller.game(widget.id)?.isSteam == true) {
-          unawaited(
-            widget.controller.checkInstallation(widget.id, refreshSize: false),
-          );
-        }
-      },
-    );
+    _lifecycle = AppLifecycleListener(onResume: _checkSteamInstallation);
+    _steamCheckTimer = Timer.periodic(const Duration(seconds: 12), (_) {
+      if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+        _checkSteamInstallation();
+      }
+    });
     query = TextEditingController(
       text:
           widget.controller.game(widget.id)?.hltb?.title ??
@@ -127,9 +103,6 @@ class _DetailsPageState extends State<DetailsPage> {
   void didUpdateWidget(DetailsPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.id != widget.id) {
-      _steamCheckTimer?.cancel();
-      _steamCheckTimer = null;
-      _steamRequestStatus = null;
       allSessions = false;
       showCandidates = false;
       query.text =
@@ -374,7 +347,6 @@ class _DetailsPageState extends State<DetailsPage> {
             ),
             if (c.installations[g.appId] != null)
               Text(c.installations[g.appId]!.message),
-            if (_steamRequestStatus != null) Text(_steamRequestStatus!),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -400,8 +372,7 @@ class _DetailsPageState extends State<DetailsPage> {
                     onPressed:
                         c.running(g.appId) ||
                             c.pendingLaunches.containsKey(g.appId) ||
-                            c.managingSteamInstallation.contains(g.appId) ||
-                            (_steamCheckTimer?.isActive ?? false)
+                            c.managingSteamInstallation.contains(g.appId)
                         ? null
                         : () => _manageSteam(g, uninstall: true),
                     icon: const Icon(Icons.delete_outline),

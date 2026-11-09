@@ -10,6 +10,7 @@ import 'package:gamevault/services/steam_updates.dart';
 import 'package:gamevault/services/windows_games.dart';
 import 'package:gamevault/state/vault_controller.dart';
 import 'package:gamevault/ui/details_page.dart';
+import 'package:gamevault/ui/components.dart';
 import 'package:gamevault/ui/tracking_controls.dart';
 import 'package:gamevault/ui/steam_update_indicator.dart';
 import 'services_test.dart' show TestMetadata, TestHltb;
@@ -24,8 +25,17 @@ class ActionTestController extends VaultController {
         hltb: TestHltb(),
       );
   final launched = <int>[];
+  int installationChecks = 0;
+  InstallationEvidence? nextInstallation;
   @override
-  Future<void> checkInstallation(int id, {bool refreshSize = true}) async {}
+  Future<void> checkInstallation(int id, {bool refreshSize = true}) async {
+    installationChecks++;
+    if (nextInstallation case final evidence?) {
+      installations[id] = evidence;
+      notifyListeners();
+    }
+  }
+
   @override
   Future<void> launch(int id) async {
     launched.add(id);
@@ -33,6 +43,90 @@ class ActionTestController extends VaultController {
 }
 
 void main() {
+  testWidgets(
+    'shared cover cards show verified absence and preserve personal status',
+    (tester) async {
+      final game = VaultGame(
+        appId: 1,
+        title: 'Fixture',
+        installPath: 'x',
+        libraryPath: 'x',
+        status: GameStatus.onHold,
+      );
+      Future<void> render(InstallationStatus status) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: VaultGrid(
+                games: [game],
+                onOpen: (_) {},
+                onFavorite: (_) {},
+                updates: const {
+                  1: SteamUpdateEvidence(SteamUpdateState.available, 'Fixture'),
+                },
+                installations: {1: InstallationEvidence(status, 'Fixture')},
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+      }
+
+      await render(InstallationStatus.missing);
+      expect(find.text('Not Installed'), findsOneWidget);
+      expect(find.text('On Hold'), findsOneWidget);
+      expect(find.byType(SteamUpdateBadge), findsNothing);
+      await render(InstallationStatus.unknown);
+      expect(find.text('Not Installed'), findsNothing);
+      expect(find.byType(SteamUpdateBadge), findsOneWidget);
+      expect(find.text('On Hold'), findsOneWidget);
+    },
+  );
+  testWidgets('focus and visible timer update a Steam profile', (tester) async {
+    final c = ActionTestController(Directory.systemTemp);
+    addTearDown(c.dispose);
+    c.games = [
+      VaultGame(appId: 1, title: 'Fixture', installPath: 'x', libraryPath: 'x'),
+    ];
+    c.nextInstallation = const InstallationEvidence(
+      InstallationStatus.installed,
+      'Fixture',
+      installPath: 'x',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ListenableBuilder(
+            listenable: c,
+            builder: (_, _) => DetailsPage(controller: c, id: 1, onBack: () {}),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    c.nextInstallation = const InstallationEvidence(
+      InstallationStatus.missing,
+      'Fixture',
+    );
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    expect(find.text('Install via Steam'), findsOneWidget);
+    final checks = c.installationChecks;
+    c.nextInstallation = const InstallationEvidence(
+      InstallationStatus.installed,
+      'Fixture',
+      installPath: 'x',
+    );
+    await tester.pump(const Duration(seconds: 12));
+    expect(c.installationChecks, checks + 1);
+    expect(find.text('Play Game'), findsOneWidget);
+    expect(
+      find.textContaining('Steam has not confirmed a change'),
+      findsNothing,
+    );
+    await tester.pumpWidget(const SizedBox());
+  });
   testWidgets(
     'verified transitions replace launch in place, unknown and completed restore it; external actions stay visible',
     (tester) async {

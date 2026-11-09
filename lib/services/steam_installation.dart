@@ -61,8 +61,9 @@ class SteamInstallation {
 
   Future<InstallationEvidence> inspect(
     VaultGame game,
-    List<String> roots,
-  ) async {
+    List<String> roots, {
+    List<String>? discoveredSteamRoots,
+  }) async {
     if (game.isManual) {
       return InstallationEvidence(
         await Directory(game.installPath).exists()
@@ -77,7 +78,8 @@ class SteamInstallation {
         'A valid Steam App ID is required.',
       );
     }
-    final steamRoots = await scanner.installationRoots();
+    final steamRoots =
+        discoveredSteamRoots ?? await scanner.installationRoots();
     final queue = {...roots, game.libraryPath, ...steamRoots}.toList();
     final visited = <String>{};
     final found = <InstallationEvidence>[];
@@ -127,7 +129,11 @@ class SteamInstallation {
         }
         final path = p.join(library, 'steamapps', 'common', dir);
         final flags = int.tryParse('${m['stateflags']}');
-        if (flags == null || (flags & 4) == 0) {
+        final build = int.tryParse('${m['buildid']}') ?? 0;
+        if (flags == null ||
+            (flags & 4) == 0 ||
+            (flags & (1 | 32 | 128 | 2048 | 4096 | 32768)) != 0 ||
+            ((flags & (256 | 512 | 1024)) != 0 && build <= 0)) {
           inconsistent = true;
           continue;
         }
