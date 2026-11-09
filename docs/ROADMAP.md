@@ -1,16 +1,16 @@
 # Roadmap
 
-V2.4.1 is the current published release. It adds local Steam lifetime estimates,
+V2.4.1 introduced local Steam lifetime estimates,
 explicit historical reconciliation and cover/banner positioning. V2.3 restored
 live HowLongToBeat search, selection and refresh; later versions retain it as
 an unofficial integration. Service availability and authorization are not assumed.
 
-## V2.5 candidate
+## V2.5.0
 
 Theme Studio, optional close to tray, read-only Storage Overview and profile
-cleanup are in local development. The Steam sidecar shutdown fix is included.
+cleanup are included. Exit waits for Steam sidecar writes and offers a retry if the final session save fails.
 GameVault reports Running while an observed game is open; exit remains with
-the game itself. Candidate review and approval precede any publication.
+the game itself.
 
 ## Later candidates
 
