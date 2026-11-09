@@ -104,6 +104,16 @@ downgraded. All sidecars and their backups/locks/staging files remain private.
 
 ## Verification
 
+Shutdown previously drained cache refreshes but could miss direct account
+confirmation or baseline-acceptance writes. `SteamPlaytimeStore.close()` now
+seals the mutation queue synchronously and returns its pending completion.
+`PlaytimeOverviewController.close()` seals the store before awaiting refreshes
+and then drains admitted mutations. Reads remain available; later mutations
+fail without writing. Existing staging, atomic replacement and recovery rules
+are unchanged. Delayed confirmation/acceptance regression tests verify shutdown
+waits, saved values survive reload, new writes are rejected, repeated close is
+safe, and session records remain unchanged. This change is pending release.
+
 `test/playtime_reconciliation_test.dart` covers full/partial/zero/assumed overlap,
 missing and explicit zero Steam values, manual zero/nonzero values, stale-input
 acknowledgement, refreshes and decreases, additional active time, open sessions,

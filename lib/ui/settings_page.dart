@@ -26,6 +26,16 @@ class SettingsPage extends StatelessWidget {
         const SectionTitle('General'),
         SwitchListTile.adaptive(
           contentPadding: EdgeInsets.zero,
+          title: const Text('Keep tracking in the system tray'),
+          subtitle: const Text(
+            'Close hides GameVault. Use Exit GameVault from the tray menu to stop tracking.',
+          ),
+          value: c.settings.closeToTray,
+          onChanged: (enabled) =>
+              c.setSettings(c.settings.copy(closeToTray: enabled)),
+        ),
+        SwitchListTile.adaptive(
+          contentPadding: EdgeInsets.zero,
           title: const Text('Launch GameVault when Windows starts'),
           subtitle: Text(
             c.startup?.allowed == true

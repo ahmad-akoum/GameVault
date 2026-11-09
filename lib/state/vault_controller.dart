@@ -169,6 +169,44 @@ class VaultController extends ChangeNotifier {
     }
   }
 
+  Future<InstalledStorage> overviewStorage(
+    VaultGame game, {
+    required bool refresh,
+  }) async {
+    final service = storageService;
+    if (service == null || _closing || storageBlocked) {
+      return InstalledStorage(
+        '',
+        null,
+        DateTime.now(),
+        message: 'Storage is unavailable.',
+      );
+    }
+    try {
+      final path = await _directoryFor(game);
+      if (_closing || !await Directory(path).exists()) {
+        throw const FileSystemException('Installation is unavailable');
+      }
+      final value = refresh
+          ? await service.inspect(path, refresh: true)
+          : await service.cached(path);
+      return value ??
+          InstalledStorage(
+            path,
+            null,
+            service.now(),
+            message: 'Not measured yet.',
+          );
+    } catch (_) {
+      return InstalledStorage(
+        '',
+        null,
+        service.now(),
+        message: 'Installation could not be verified.',
+      );
+    }
+  }
+
   final SessionTracker tracker = SessionTracker();
   final Stopwatch _clock = Stopwatch();
   Timer? _monitor;
@@ -874,6 +912,8 @@ class VaultController extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool _finalSessionSavePending = false;
+
   Future<void> shutdown() async {
     _closing = true;
     _playtimeMonitor?.cancel();
@@ -885,10 +925,15 @@ class VaultController extends ChangeNotifier {
     await _poll;
     await _startupJob;
     await _mutate(() async {
-      final hasOpen = tracker.sessions.any((s) => s.open);
+      _finalSessionSavePending |= tracker.sessions.any((s) => s.open);
       tracker.closeAll('GameVault closed');
-      if (hasOpen) await _commit(games, settings);
+      if (_finalSessionSavePending) {
+        _finalSessionSavePending = !await _commit(games, settings);
+      }
     });
+    if (_finalSessionSavePending) {
+      throw StorageFailure(error ?? 'The final session could not be saved.');
+    }
     storageBlocked = true;
     await _mutationTail;
     await store.close();

@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'theme_editor.dart';
 import '../models/game.dart';
 import '../state/vault_controller.dart';
 import 'components.dart';
-import 'theme.dart';
 
 const appearancePresets = <String, (int, int, int)>{
   'Cobalt': (0xff78aaff, 0xff101725, 0xff192840),
@@ -24,7 +23,14 @@ class AppearanceControls extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionTitle('Appearance'),
+        SectionTitle(
+          'Appearance',
+          action: FilledButton.tonalIcon(
+            icon: const Icon(Icons.palette_outlined),
+            label: const Text('Theme studio'),
+            onPressed: () => _pick(context, 'Accent'),
+          ),
+        ),
         Wrap(
           spacing: 10,
           runSpacing: 10,
@@ -117,123 +123,29 @@ class AppearanceControls extends StatelessWidget {
   }
 
   Future<void> _pick(BuildContext context, String field) async {
-    final s = controller.settings;
-    final brightness = Theme.of(context).brightness;
-    var picked = switch (field) {
-      'Accent' => s.accent,
-      'Background' =>
-        s.background ?? Theme.of(context).colorScheme.surface.toARGB32(),
-      _ =>
-        s.surface ?? Theme.of(context).colorScheme.surfaceContainer.toARGB32(),
-    };
-    final hex = TextEditingController(
-      text: picked.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase(),
-    );
-    final chosen = await showDialog<int>(
+    final chosen = await showDialog<VaultSettings>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, update) {
-          final preview = s.copy(
-            accent: field == 'Accent' ? picked : null,
-            background: field == 'Background' ? picked : null,
-            surface: field == 'Surface' ? picked : null,
-          );
-          return AlertDialog(
-            title: Text('Custom $field color'),
-            content: SizedBox(
-              width: 420,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Theme(
-                      data: vaultTheme(
-                        brightness,
-                        preview.accent,
-                        background: preview.background,
-                        surface: preview.surface,
-                      ),
-                      child: const _Preview(),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: hex,
-                      maxLength: 6,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(
-                          RegExp('[a-fA-F0-9]'),
-                        ),
-                      ],
-                      decoration: const InputDecoration(
-                        labelText: 'Hex color',
-                        prefixText: '#',
-                      ),
-                      onChanged: (v) => update(() {
-                        if (v.length == 6) {
-                          picked = 0xff000000 | int.parse(v, radix: 16);
-                        }
-                      }),
-                    ),
-                    for (var channel = 0; channel < 3; channel++)
-                      Row(
-                        children: [
-                          SizedBox(
-                            width: 48,
-                            child: Text(['Red', 'Green', 'Blue'][channel]),
-                          ),
-                          Expanded(
-                            child: Slider(
-                              label: '${(picked >> (16 - channel * 8)) & 255}',
-                              value: ((picked >> (16 - channel * 8)) & 255)
-                                  .toDouble(),
-                              max: 255,
-                              divisions: 255,
-                              onChanged: (v) => update(() {
-                                final shift = 16 - channel * 8;
-                                picked =
-                                    (picked & ~(255 << shift)) |
-                                    (v.round() << shift);
-                                hex.text = picked
-                                    .toRadixString(16)
-                                    .substring(2)
-                                    .toUpperCase();
-                              }),
-                            ),
-                          ),
-                        ],
-                      ),
-                  ],
-                ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: hex.text.length == 6
-                    ? () => Navigator.pop(context, picked)
-                    : null,
-                child: const Text('Apply'),
-              ),
-            ],
-          );
-        },
+      builder: (_) => ThemeEditor(
+        settings: controller.settings,
+        initialRole: [
+          'Accent',
+          'Background',
+          'Surface',
+        ].indexOf(field).clamp(0, 2),
       ),
     );
-    await Future<void>.delayed(const Duration(milliseconds: 250));
-    hex.dispose();
-    if (chosen != null) {
-      // Preserve any unrelated settings changed while the dialog was open.
-      await controller.setSettings(
-        controller.settings.copy(
-          accent: field == 'Accent' ? chosen : null,
-          background: field == 'Background' ? chosen : null,
-          surface: field == 'Surface' ? chosen : null,
-        ),
-      );
-    }
+    if (chosen == null) return;
+    await controller.setSettings(
+      controller.settings
+          .copy(resetColors: true)
+          .copy(
+            theme: chosen.theme,
+            accent: chosen.accent,
+            background: chosen.background,
+            surface: chosen.surface,
+            gradient: chosen.gradient,
+          ),
+    );
   }
 }
 

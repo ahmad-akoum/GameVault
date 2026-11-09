@@ -8,6 +8,8 @@ import 'details_page.dart';
 import 'settings_page.dart';
 import 'activity_pages.dart';
 import 'collections_page.dart';
+import 'theme.dart';
+import 'storage_overview_page.dart';
 
 class VaultShell extends StatefulWidget {
   const VaultShell({super.key, required this.controller});
@@ -104,6 +106,7 @@ class _VaultShellState extends State<VaultShell> {
             ),
             5 => StatisticsPage(controller: c, onOpen: _open),
             6 => CollectionsPage(controller: c, onOpen: _open),
+            8 => StorageOverviewPage(controller: c, onOpen: _open),
             3 => SettingsPage(controller: c, onScan: _scan),
             _ => DetectedPage(
               controller: c,
@@ -186,6 +189,7 @@ class _VaultShellState extends State<VaultShell> {
                   _nav(2, Icons.favorite_border, 'Favorites', compact),
                   _nav(6, Icons.folder_outlined, 'Collections', compact),
                   _nav(5, Icons.bar_chart_rounded, 'Activity', compact),
+                  _nav(8, Icons.storage_outlined, 'Storage Overview', compact),
                   const SizedBox(height: 24),
                   Padding(
                     padding: EdgeInsets.symmetric(
@@ -260,22 +264,30 @@ class _VaultShellState extends State<VaultShell> {
                     ),
                   ),
                 Expanded(
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      narrow
-                          ? 12
-                          : compact
-                          ? 24
-                          : 36,
-                      narrow ? 8 : 30,
-                      narrow
-                          ? 12
-                          : compact
-                          ? 24
-                          : 36,
-                      24,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: vaultBackdrop(
+                        Theme.of(context),
+                        c.settings.gradient,
+                      ),
                     ),
-                    child: content,
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        narrow
+                            ? 12
+                            : compact
+                            ? 24
+                            : 36,
+                        narrow ? 8 : 30,
+                        narrow
+                            ? 12
+                            : compact
+                            ? 24
+                            : 36,
+                        24,
+                      ),
+                      child: content,
+                    ),
                   ),
                 ),
                 if (c.importing && page != 4)

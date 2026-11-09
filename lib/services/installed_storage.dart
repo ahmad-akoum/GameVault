@@ -29,9 +29,11 @@ class InstalledStorage {
 String storageSize(int? bytes) {
   if (bytes == null) return 'Unavailable';
   if (bytes == 0) return '0 B';
-  if (bytes < 1000000) return '${(bytes / 1000).toStringAsFixed(1)} KB';
-  if (bytes < 1000000000) return '${(bytes / 1000000).toStringAsFixed(1)} MB';
-  return '${(bytes / 1000000000).toStringAsFixed(2)} GB';
+  // Match the binary scaling familiar from Windows Explorer's GB display.
+  if (bytes < 1024) return '$bytes B';
+  if (bytes < 1 << 20) return '${(bytes / (1 << 10)).toStringAsFixed(1)} KB';
+  if (bytes < 1 << 30) return '${(bytes / (1 << 20)).toStringAsFixed(1)} MB';
+  return '${(bytes / (1 << 30)).toStringAsFixed(2)} GB';
 }
 
 /// A serial worker isolate scans logical file bytes without following links.
@@ -97,6 +99,15 @@ class InstalledStorageService {
       _pending.remove(key);
     }
   }
+
+  Future<InstalledStorage?> cached(String path) async {
+    await (_load ??= _read());
+    return _cache[p.normalize(path).toLowerCase()];
+  }
+
+  bool stale(InstalledStorage value) =>
+      now().isBefore(value.checkedAt) ||
+      now().difference(value.checkedAt) >= const Duration(hours: 24);
 
   static Future<InstalledStorage> _measure(String path) => Isolate.run(() {
     var bytes = 0, failed = false;

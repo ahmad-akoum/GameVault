@@ -179,6 +179,7 @@ class _DetailsPageState extends State<DetailsPage> {
                 ),
                 SizedBox(height: gap),
                 TrackingControls(controller: c, game: g),
+                const SizedBox(height: 10),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -247,7 +248,15 @@ class _DetailsPageState extends State<DetailsPage> {
           },
         ),
         SizedBox(height: gap),
-        const SectionTitle('Recent sessions'),
+        SectionTitle(
+          'Recent sessions',
+          action: c.tracker.lastPlayed(g.appId) != null
+              ? Text(
+                  'Last played ${c.tracker.lastPlayed(g.appId)!.toLocal().toString().split('.').first}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                )
+              : null,
+        ),
         if (!c.tracker.sessions.any((s) => s.gameId == g.appId))
           const Text(
             'No recorded sessions yet. Keep GameVault open while playing.',
@@ -267,7 +276,7 @@ class _DetailsPageState extends State<DetailsPage> {
         TrackingControls(
           controller: c,
           game: g,
-          section: TrackingSection.progress,
+          section: TrackingSection.collections,
         ),
         SizedBox(height: gap),
         ExpansionTile(
