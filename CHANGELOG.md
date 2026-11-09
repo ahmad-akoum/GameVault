@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.5.1 candidate (unreleased)
+## 2.5.1
 
 ### Added
 - Steam-native uninstall and reinstall actions for verified Steam profiles.
@@ -14,6 +14,7 @@
 - Recognize a completed Steam uninstall when a stale library index still lists the game.
 - Show a neutral confirmation and a separate storage group for verified uninstalled games.
 - Refresh the open Steam profile automatically and show a Not Installed badge on library and collection covers.
+- Block Steam actions on conflicting manifest evidence and keep negative storage results isolated by game.
 
 ## 2.5.0
 

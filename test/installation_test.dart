@@ -16,8 +16,9 @@ import 'services_test.dart' show TestMetadata, TestHltb;
 
 class _FixturePlatform implements GamePlatform {
   bool running = false;
+  final launches = <int>[];
   @override
-  Future<void> launch(VaultGame game) async {}
+  Future<void> launch(VaultGame game) async => launches.add(game.appId);
   @override
   Future<WindowsSample> sample(List<VaultGame> games) async => WindowsSample([
     if (running)
@@ -55,6 +56,55 @@ void main() {
       '"AppState" { "appid" "1" "installdir" "$dir" "buildid" "123" "stateflags" "4" $extra }',
     );
   }
+
+  test(
+    'Steam launch and uninstall require unambiguous manifest evidence',
+    () async {
+      final a = p.join(temp.path, 'A');
+      final b = p.join(temp.path, 'B');
+      await installed(a);
+      final platform = _FixturePlatform();
+      final c = VaultController(
+        store: LocalStore(temp),
+        scanner: SteamScanner(installationRoots: () async => [a, b]),
+        metadata: TestMetadata(),
+        hltb: TestHltb(),
+        platform: platform,
+      );
+      addTearDown(c.dispose);
+      final profile = game(a);
+      c.games = [profile];
+      c.settings = c.settings.copy(trackingEnabled: false);
+      await c.checkInstallation(1);
+      expect(c.installations[1]?.status, InstallationStatus.installed);
+      final manifest = File(p.join(a, 'steamapps', 'appmanifest_1.acf'));
+      final valid = await manifest.readAsString();
+      final other = File(p.join(b, 'steamapps', 'appmanifest_1.acf'));
+      await other.parent.create(recursive: true);
+      await other.writeAsString('"AppState" {');
+      await c.launch(
+        1,
+      ); // Stale positive UI evidence cannot authorize dispatch.
+      expect(c.installations[1]?.status, InstallationStatus.unknown);
+      expect(await c.requestSteamInstallation(1, uninstall: true), isFalse);
+      expect(platform.launches, isEmpty);
+      await other.delete();
+      await manifest.writeAsString(
+        valid.replaceFirst('"stateflags" "4"', '"stateflags" "4194308"'),
+      );
+      await c.launch(1);
+      expect(c.installations[1]?.status, InstallationStatus.unknown);
+      expect(await c.requestSteamInstallation(1, uninstall: true), isFalse);
+      expect(platform.launches, isEmpty);
+      await manifest.writeAsString(valid);
+      await c.launch(1);
+      expect(platform.launches, [1]);
+      await manifest.delete();
+      await c.checkInstallation(1);
+      expect(c.installations[1]?.status, InstallationStatus.missing);
+      await c.shutdown();
+    },
+  );
 
   test(
     'Steam dispatch is verified and profile survives removal and reinstall',

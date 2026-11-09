@@ -102,3 +102,9 @@ verified Not Installed in the existing badge slot and preserve personal
 statuses. Unfinished installs remain inconclusive, and the old timeout
 message has been removed. Fixture tests cover focus return, an open-window
 transition, incomplete manifests and shared card badge precedence.
+
+Candidate 6 distinguishes an unreadable unrelated library from a conflicting
+manifest for the same AppID. Unknown flag bits or a conflicting manifest
+block installed actions. Steam Play also rechecks the manifest at dispatch.
+Storage Overview reuses only measured bytes for the same resolved folder.
+An unavailable, uninstalled, or relocated result stays with its own game.

@@ -830,13 +830,26 @@ class VaultController extends ChangeNotifier {
     pendingLaunches[id] = _clock.elapsed.inSeconds + 120;
     notifyListeners();
     try {
-      if (g.isEpic || (g.isSteam && !await Directory(g.installPath).exists())) {
+      if (g.isSteam) {
+        final evidence = await _inspect(g);
+        installations[id] = evidence;
+        if (evidence.status == InstallationStatus.needsRefresh) {
+          await refreshInstallation(id, feedback: false);
+        }
+        if (installations[id]?.status != InstallationStatus.installed) {
+          throw const FileSystemException('Steam installation unavailable');
+        }
+      } else if (g.isEpic) {
         await refreshInstallation(id, feedback: false);
-        if (g.isEpic && installations[id]?.installPath == null) {
+        if (installations[id]?.installPath == null) {
           throw const FileSystemException('Epic installation unavailable');
         }
       }
-      await platform!.launch(game(id) ?? g);
+      if (_closing || game(id) == null) {
+        pendingLaunches.remove(id);
+        return;
+      }
+      await platform!.launch(game(id)!);
       if (!settings.trackingEnabled) {
         pendingLaunches.remove(id);
         notifyListeners();

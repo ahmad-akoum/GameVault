@@ -85,6 +85,7 @@ class SteamInstallation {
     final found = <InstallationEvidence>[];
     final indexedApps = <int, DateTime>{};
     var inconsistent = steamRoots.isEmpty || !p.isAbsolute(game.libraryPath);
+    var manifestConflict = false;
     for (var i = 0; i < queue.length; i++) {
       final root = p.normalize(queue[i]);
       if (!p.isAbsolute(root) || !visited.add(root.toLowerCase())) continue;
@@ -112,10 +113,27 @@ class SteamInstallation {
           // An absent manifest is only meaningful on a readable library.
           await file.parent.list().isEmpty;
           continue;
-        }
-        final m = ValveKeyValues.parse(manifest)['appstate'];
-        if (m is! Map || '${m['appid']}' != '${game.appId}') {
+        } on FileSystemException {
+          // A named manifest that cannot be read is different from an
+          // unrelated library that cannot be reached.
+          final name = p.basename(file.path).toLowerCase();
+          if (await file.parent.list().any(
+            (entry) => p.basename(entry.path).toLowerCase() == name,
+          )) {
+            manifestConflict = true;
+          }
           inconsistent = true;
+          continue;
+        }
+        Object? m;
+        try {
+          m = ValveKeyValues.parse(manifest)['appstate'];
+        } on FormatException {
+          manifestConflict = true;
+          continue;
+        }
+        if (m is! Map || '${m['appid']}' != '${game.appId}') {
+          manifestConflict = true;
           continue;
         }
         final dir = m['installdir']?.toString() ?? '';
@@ -124,21 +142,22 @@ class SteamInstallation {
             dir.contains('..') ||
             dir.contains('/') ||
             dir.contains('\\')) {
-          inconsistent = true;
+          manifestConflict = true;
           continue;
         }
         final path = p.join(library, 'steamapps', 'common', dir);
         final flags = int.tryParse('${m['stateflags']}');
         final build = int.tryParse('${m['buildid']}') ?? 0;
         if (flags == null ||
+            (flags & ~0x1ffff) != 0 ||
             (flags & 4) == 0 ||
             (flags & (1 | 32 | 128 | 2048 | 4096 | 32768)) != 0 ||
             ((flags & (256 | 512 | 1024)) != 0 && build <= 0)) {
-          inconsistent = true;
+          manifestConflict = true;
           continue;
         }
         if (!await Directory(path).exists()) {
-          inconsistent = true;
+          manifestConflict = true;
           continue;
         }
         if (found.any(
@@ -169,6 +188,12 @@ class SteamInstallation {
       } on FormatException {
         inconsistent = true;
       }
+    }
+    if (manifestConflict) {
+      return const InstallationEvidence(
+        InstallationStatus.unknown,
+        'Steam records for this App ID are incomplete or contradictory.',
+      );
     }
     if (found.length == 1) return found.single;
     if (found.length > 1) {

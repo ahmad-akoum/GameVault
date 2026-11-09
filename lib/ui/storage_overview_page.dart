@@ -73,9 +73,16 @@ class _StorageOverviewPageState extends State<StorageOverviewPage> {
         final cached = await c.overviewStorage(game, refresh: false);
         if (!mounted || cancel) break;
         final key = storagePathKey(cached.path);
-        final result = refresh && cached.path.isNotEmpty
-            ? seen[key] ??= await c.overviewStorage(game, refresh: true)
-            : cached;
+        var result = cached;
+        if (refresh && !cached.notInstalled && cached.path.isNotEmpty) {
+          result = seen[key] ?? await c.overviewStorage(game, refresh: true);
+          if (!result.notInstalled &&
+              result.bytes != null &&
+              result.path.isNotEmpty &&
+              storagePathKey(result.path) == key) {
+            seen[key] = result;
+          }
+        }
         if (!mounted) break;
         setState(() {
           results[game.appId] = result;
