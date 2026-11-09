@@ -24,6 +24,7 @@ class SteamUpdateEvidence {
     this.recordedAt,
     this.source = 'Steam local metadata',
     this.lastKnown = false,
+    this.matchesRecordedTarget = false,
   });
   static const unknown = SteamUpdateEvidence(
     SteamUpdateState.unknown,
@@ -33,6 +34,7 @@ class SteamUpdateEvidence {
   final String message, source;
   final DateTime? recordedAt;
   final bool lastKnown;
+  final bool matchesRecordedTarget;
   bool get pending => const [
     SteamUpdateState.available,
     SteamUpdateState.queued,
@@ -44,7 +46,8 @@ class SteamUpdateEvidence {
   String? get badge => !lastKnown && pending ? 'Update Available' : null;
   String get summary =>
       '${lastKnown ? 'Last known: ' : ''}${pending ? 'Update Available' : state.label}';
-  String get signature => '$state|$message|$source|$recordedAt|$lastKnown';
+  String get signature =>
+      '$state|$message|$source|$recordedAt|$lastKnown|$matchesRecordedTarget';
 }
 
 class SteamLogEvent {
@@ -157,6 +160,43 @@ class SteamUpdateService {
     return result;
   }
 
+  Future<bool> confirmsUninstallAfter(
+    int appId,
+    Iterable<String> steamRoots,
+    DateTime indexedAt,
+  ) async {
+    SteamLogEvent? newestApp;
+    SteamLogEvent? newestPhase;
+    for (final root in steamRoots) {
+      final log = await _read(
+        p.join(root, 'logs', 'content_log.txt'),
+        limit: 1024 * 1024,
+        tail: true,
+      );
+      final record = log == null ? null : parseLog(log.text)[appId];
+      final app = record?.app;
+      final phase = record?.phase;
+      if (app != null &&
+          (newestApp == null ||
+              app.time.isAfter(newestApp.time) ||
+              (app.time == newestApp.time &&
+                  !app.states.contains('Uninstalled')))) {
+        newestApp = app;
+      }
+      if (phase != null &&
+          (newestPhase == null || phase.time.isAfter(newestPhase.time))) {
+        newestPhase = phase;
+      }
+    }
+    final app = newestApp;
+    return app != null &&
+        app.time.isAfter(indexedAt) &&
+        !app.time.isAfter(clock()) &&
+        app.states.length == 1 &&
+        app.states.contains('Uninstalled') &&
+        !(newestPhase?.time.isAfter(app.time) ?? false);
+  }
+
   /// Flags are the saved client state, not a comparison with the public branch.
   /// Current-session log transitions supersede older manifests; active download
   /// phases require current-session log evidence, not remaining byte counters.
@@ -233,14 +273,18 @@ class SteamUpdateService {
       source = 'Steam content_log current-session app state';
     }
     final offline = started == null;
-    SteamUpdateEvidence evidence(SteamUpdateState state, String message) =>
-        SteamUpdateEvidence(
-          state,
-          message,
-          recordedAt: recorded,
-          source: source,
-          lastKnown: offline,
-        );
+    SteamUpdateEvidence evidence(
+      SteamUpdateState state,
+      String message, {
+      bool matchesRecordedTarget = false,
+    }) => SteamUpdateEvidence(
+      state,
+      message,
+      recordedAt: recorded,
+      source: source,
+      lastKnown: offline,
+      matchesRecordedTarget: matchesRecordedTarget,
+    );
     if (!required) {
       if (queued || paused || running) return SteamUpdateEvidence.unknown;
       final build = '${manifest['buildid'] ?? ''}',
@@ -254,6 +298,8 @@ class SteamUpdateService {
       return evidence(
         SteamUpdateState.noUpdateRecorded,
         'Steam has not recorded a pending update here. This does not guarantee the game is up to date.',
+        matchesRecordedTarget:
+            (int.tryParse(build) ?? 0) > 0 && target == build,
       );
     }
     if ((int.tryParse('${manifest['buildid']}') ?? 0) <= 0) {

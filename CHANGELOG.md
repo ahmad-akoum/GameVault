@@ -8,6 +8,10 @@
 
 ### Changed
 - Moved game membership editing from profiles to Manage games on the Collections page.
+- Simplified the Game Update Center status and hid it for verified uninstalled games.
+
+### Fixed
+- Recognize a completed Steam uninstall when a stale library index still lists the game.
 
 ## 2.5.0
 

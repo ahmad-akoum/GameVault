@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import '../models/game.dart';
 import 'steam_scanner.dart';
+import 'steam_updates.dart';
 
 enum InstallationStatus {
   installed('Installed'),
@@ -80,7 +81,7 @@ class SteamInstallation {
     final queue = {...roots, game.libraryPath, ...steamRoots}.toList();
     final visited = <String>{};
     final found = <InstallationEvidence>[];
-    final indexedApps = <int>{};
+    final indexedApps = <int, DateTime>{};
     var inconsistent = steamRoots.isEmpty || !p.isAbsolute(game.libraryPath);
     for (var i = 0; i < queue.length; i++) {
       final root = p.normalize(queue[i]);
@@ -170,7 +171,12 @@ class SteamInstallation {
         'Multiple installations were found. Resolve the duplicate in Steam before refreshing.',
       );
     }
-    inconsistent |= indexedApps.contains(game.appId);
+    final indexedAt = indexedApps[game.appId];
+    if (!inconsistent && indexedAt != null) {
+      inconsistent = !await SteamUpdateService(
+        scanner,
+      ).confirmsUninstallAfter(game.appId, steamRoots, indexedAt);
+    }
     return InstallationEvidence(
       inconsistent ? InstallationStatus.unknown : InstallationStatus.missing,
       inconsistent

@@ -72,3 +72,18 @@ actual Steam dialog and file removal still require owner acceptance with
 a specifically approved sacrificial game.
 
 - [Valve's documented native install link](https://partner.steamgames.com/doc/steamhardware/steamdeck/devkits)
+
+## Candidate 3 detection correction
+
+Steam can remove a game manifest and leave its libraryfolders.vdf entry
+and unmanaged files behind. An older index no longer blocks Not Installed
+when every known library is readable, no matching manifest remains, and
+Steam's bounded content log has a newer Uninstalled transition for the
+same AppID. A newer contradictory transition or a newer index leaves
+the result Unknown. Positive installed manifests still take precedence.
+
+The profile hides executable and storage actions plus Game Update Center
+for verified uninstalled Steam games. Unknown disables Play and suppresses
+stale update claims. The update center keeps its Steam action and refresh
+control. Up to Date is reserved for live Steam evidence of a matching
+recorded target build; other inconclusive evidence displays Unknown.

@@ -174,15 +174,48 @@ void main() {
     final root = p.join(temp.path, 'Steam');
     await Directory(p.join(root, 'steamapps')).create(recursive: true);
     final escaped = root.replaceAll('\\', '\\\\');
-    await File(p.join(root, 'steamapps', 'libraryfolders.vdf')).writeAsString(
-      '"libraryfolders" { "0" { "path" "$escaped" "apps" { "1" "10" } } }',
-    );
+    final index = await File(p.join(root, 'steamapps', 'libraryfolders.vdf'))
+        .writeAsString(
+          '"libraryfolders" { "0" { "path" "$escaped" "apps" { "1" "10" } } }',
+        );
     final service = SteamInstallation(
       SteamScanner(installationRoots: () async => [root]),
     );
     expect(
       (await service.inspect(game(root), [])).status,
       InstallationStatus.unknown,
+    );
+    await Directory(game(root).installPath).create(recursive: true);
+    await index.setLastModified(DateTime(2025, 1, 1, 8));
+    final log = File(p.join(root, 'logs', 'content_log.txt'));
+    await log.parent.create();
+    await log.writeAsString(
+      '[2025-01-01 09:00:00] AppID 1 state changed : Uninstalled,\n',
+    );
+    expect(
+      (await service.inspect(game(root), [])).status,
+      InstallationStatus.missing,
+    );
+    await log.writeAsString(
+      '[2025-01-01 10:00:00] AppID 1 state changed : Update Required,\n',
+      mode: FileMode.append,
+    );
+    expect(
+      (await service.inspect(game(root), [])).status,
+      InstallationStatus.unknown,
+    );
+    await log.writeAsString(
+      '[2025-01-01 09:00:00] AppID 1 state changed : Uninstalled,\n',
+    );
+    await index.setLastModified(DateTime(2025, 1, 1, 10));
+    expect(
+      (await service.inspect(game(root), [])).status,
+      InstallationStatus.unknown,
+    );
+    await installed(root);
+    expect(
+      (await service.inspect(game(root), [])).status,
+      InstallationStatus.installed,
     );
   });
 

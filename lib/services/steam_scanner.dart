@@ -150,7 +150,7 @@ class SteamScanner {
   Future<List<String>> discoverPaths(
     String root, [
     List<String>? warnings,
-    Set<int>? indexedApps,
+    Map<int, DateTime>? indexedApps,
   ]) async {
     final normalized = p.normalize(root);
     final library = p.basename(normalized).toLowerCase() == 'steamapps'
@@ -162,15 +162,24 @@ class SteamScanner {
       p.join(library, 'config', 'libraryfolders.vdf'),
     ]) {
       try {
+        final file = File(config);
+        final modified = indexedApps == null ? null : await file.lastModified();
         final value = ValveKeyValues.parse(
-          await File(config).readAsString(),
+          await file.readAsString(),
         )['libraryfolders'];
+        if (modified != null && await file.lastModified() != modified) {
+          throw const FormatException('Steam library list changed during read');
+        }
         if (value is! Map) throw const FormatException('Invalid library list');
         for (final entry in value.values) {
-          if (entry case {'apps': final Map apps}) {
-            indexedApps?.addAll(
-              apps.keys.map((id) => int.tryParse('$id')).whereType<int>(),
-            );
+          final apps = entry is Map ? entry['apps'] : null;
+          if (modified != null && indexedApps != null && apps is Map) {
+            for (final key in apps.keys) {
+              final id = int.tryParse('$key');
+              if (id != null && (indexedApps[id]?.isBefore(modified) ?? true)) {
+                indexedApps[id] = modified;
+              }
+            }
           }
           final path = entry is Map ? entry['path'] : entry;
           if (path is String &&

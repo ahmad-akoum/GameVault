@@ -157,6 +157,8 @@ class _DetailsPageState extends State<DetailsPage> {
   Widget build(BuildContext context) {
     final c = widget.controller;
     final g = c.game(widget.id);
+    final installation = c.installations[widget.id];
+    final notInstalled = installation?.status == InstallationStatus.missing;
     if (g == null) {
       return Center(
         child: OutlinedButton(
@@ -272,35 +274,38 @@ class _DetailsPageState extends State<DetailsPage> {
                           g.isEpic ? 'Open Epic Library' : 'Open in Steam',
                         ),
                       ),
-                    OutlinedButton.icon(
-                      onPressed: () => c.openGameLocation(g.appId),
-                      icon: const Icon(Icons.folder_open, size: 18),
-                      label: const Text('Open File Location'),
-                    ),
+                    if (!notInstalled)
+                      OutlinedButton.icon(
+                        onPressed: () => c.openGameLocation(g.appId),
+                        icon: const Icon(Icons.folder_open, size: 18),
+                        label: const Text('Open File Location'),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 16),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 8,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Text(
-                      'Installed size: ${c.sizing.contains(g.appId) ? 'Calculating…' : storageSize(c.storage[g.appId]?.bytes)}',
-                    ),
-                    Text(
-                      'Drive: ${c.storage[g.appId]?.drive ?? InstalledStorage(g.installPath, null, DateTime(1970)).drive}',
-                    ),
-                    TextButton.icon(
-                      onPressed: c.sizing.contains(g.appId)
-                          ? null
-                          : () => c.refreshStorage(g.appId, force: true),
-                      icon: const Icon(Icons.refresh, size: 16),
-                      label: const Text('Refresh storage'),
-                    ),
-                  ],
-                ),
-                if (c.storage[g.appId]?.message != null &&
+                if (!notInstalled)
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        'Installed size: ${c.sizing.contains(g.appId) ? 'Calculating…' : storageSize(c.storage[g.appId]?.bytes)}',
+                      ),
+                      Text(
+                        'Drive: ${c.storage[g.appId]?.drive ?? InstalledStorage(g.installPath, null, DateTime(1970)).drive}',
+                      ),
+                      TextButton.icon(
+                        onPressed: c.sizing.contains(g.appId)
+                            ? null
+                            : () => c.refreshStorage(g.appId, force: true),
+                        icon: const Icon(Icons.refresh, size: 16),
+                        label: const Text('Refresh storage'),
+                      ),
+                    ],
+                  ),
+                if (!notInstalled &&
+                    c.storage[g.appId]?.message != null &&
                     c.storage[g.appId]?.message !=
                         'Logical installed file size; links are excluded.')
                   Text(
@@ -358,11 +363,12 @@ class _DetailsPageState extends State<DetailsPage> {
           tilePadding: EdgeInsets.zero,
           title: const Text('Game Settings / Installation / Tracking'),
           children: [
-            TrackingControls(
-              controller: c,
-              game: g,
-              section: TrackingSection.settings,
-            ),
+            if (!notInstalled)
+              TrackingControls(
+                controller: c,
+                game: g,
+                section: TrackingSection.settings,
+              ),
             Text(
               'Installation: ${c.installations[g.appId]?.status.label ?? InstallationStatus.unknown.label}',
             ),
@@ -381,11 +387,12 @@ class _DetailsPageState extends State<DetailsPage> {
                     icon: const Icon(Icons.refresh),
                     label: const Text('Refresh Installation'),
                   ),
-                OutlinedButton(
-                  onPressed: () =>
-                      c.openGameLocation(g.appId, executable: true),
-                  child: const Text('Open EXE Location'),
-                ),
+                if (!notInstalled)
+                  OutlinedButton(
+                    onPressed: () =>
+                        c.openGameLocation(g.appId, executable: true),
+                    child: const Text('Open EXE Location'),
+                  ),
                 if (g.isSteam &&
                     SteamInstallation.validAppId(g.appId) &&
                     c.installations[g.appId]?.installPath != null)
@@ -402,22 +409,17 @@ class _DetailsPageState extends State<DetailsPage> {
                   ),
               ],
             ),
-            if (g.isSteam) ...[
+            if (g.isSteam && !notInstalled) ...[
               const SizedBox(height: 16),
               const SectionTitle('Game Update Center'),
               SteamUpdatePanel(
                 showOpen: false,
-                evidence:
-                    c.steamUpdates[g.appId] ?? SteamUpdateEvidence.unknown,
+                evidence: installation?.installPath != null
+                    ? c.steamUpdates[g.appId] ?? SteamUpdateEvidence.unknown
+                    : SteamUpdateEvidence.unknown,
                 onOpen: () => c.openGameLocation(g.appId, steam: true),
                 onRefresh: () => c.refreshSteamUpdates(),
               ),
-              if (c.installations[g.appId]?.buildId != null)
-                Text('Installed build: ${c.installations[g.appId]!.buildId}'),
-              if (c.installations[g.appId]?.updated != null)
-                Text(
-                  'Steam manifest LastUpdated: ${c.installations[g.appId]!.updated!.toLocal()}',
-                ),
             ],
           ],
         ),

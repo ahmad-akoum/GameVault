@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gamevault/models/game.dart';
 import 'package:gamevault/services/local_store.dart';
 import 'package:gamevault/services/steam_scanner.dart';
+import 'package:gamevault/services/steam_installation.dart';
 import 'package:gamevault/services/steam_updates.dart';
 import 'package:gamevault/services/windows_games.dart';
 import 'package:gamevault/state/vault_controller.dart';
@@ -23,6 +24,8 @@ class ActionTestController extends VaultController {
         hltb: TestHltb(),
       );
   final launched = <int>[];
+  @override
+  Future<void> checkInstallation(int id, {bool refreshSize = true}) async {}
   @override
   Future<void> launch(int id) async {
     launched.add(id);
@@ -53,6 +56,11 @@ void main() {
           libraryPath: dir.path,
         ),
       ];
+      c.installations[1] = InstallationEvidence(
+        InstallationStatus.installed,
+        'Fixture',
+        installPath: dir.path,
+      );
       final calls = <MethodCall>[];
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(WindowsGames.channel, (call) async {
@@ -187,6 +195,65 @@ void main() {
           expect(tester.takeException(), isNull);
         }
       }
+      tester.view.physicalSize = const Size(1280, 2600);
+      await render(SteamUpdateEvidence.unknown);
+      await tester.ensureVisible(
+        find.text('Game Settings / Installation / Tracking'),
+      );
+      await tester.tap(find.text('Game Settings / Installation / Tracking'));
+      await tester.pumpAndSettle();
+      expect(find.text('Game Update Center'), findsOneWidget);
+      expect(find.text('Refresh update status'), findsOneWidget);
+      expect(find.text('Update diagnostics'), findsNothing);
+      c.installations[1] = const InstallationEvidence(
+        InstallationStatus.missing,
+        'Fixture',
+      );
+      await render(
+        const SteamUpdateEvidence(SteamUpdateState.available, 'Stale fixture'),
+      );
+      expect(find.text('Install via Steam'), findsOneWidget);
+      expect(find.text('Installation: Not Installed'), findsOneWidget);
+      expect(find.text('Game Update Center'), findsNothing);
+      expect(find.text('Open EXE Location'), findsNothing);
+      expect(find.text('Open in Steam'), findsOneWidget);
+      c.installations[1] = const InstallationEvidence(
+        InstallationStatus.unknown,
+        'Fixture',
+      );
+      await render(
+        const SteamUpdateEvidence(SteamUpdateState.available, 'Stale fixture'),
+      );
+      expect(find.byType(SteamUpdateAction), findsNothing);
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.ancestor(
+                of: find.text('Play Game'),
+                matching: find.byWidgetPredicate(
+                  (widget) => widget is FilledButton,
+                ),
+              ),
+            )
+            .onPressed,
+        isNull,
+      );
+      c.installations[1] = InstallationEvidence(
+        InstallationStatus.installed,
+        'Fixture',
+        installPath: dir.path,
+      );
+      await render(
+        const SteamUpdateEvidence(
+          SteamUpdateState.noUpdateRecorded,
+          'Fixture',
+          matchesRecordedTarget: true,
+        ),
+      );
+      expect(find.text('Up to Date'), findsOneWidget);
+      expect(find.text('Game Update Center'), findsOneWidget);
+      expect(find.text('Play Game'), findsOneWidget);
+
       // A local game must ignore any accidental Steam evidence.
       c.games = [
         VaultGame(

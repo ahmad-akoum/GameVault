@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gamevault/models/game.dart';
 import 'package:gamevault/services/local_store.dart';
 import 'package:gamevault/services/steam_scanner.dart';
+import 'package:gamevault/services/steam_installation.dart';
 import 'package:gamevault/state/vault_controller.dart';
 import 'package:gamevault/ui/details_page.dart';
 import 'package:gamevault/ui/activity_pages.dart';
@@ -45,6 +46,11 @@ void main() {
       c.steamUpdates[1] = const SteamUpdateEvidence(
         SteamUpdateState.available,
         'Steam explicitly records Update Required.',
+      );
+      c.installations[1] = InstallationEvidence(
+        InstallationStatus.installed,
+        'Fixture',
+        installPath: dir.path,
       );
       c.tracker.sessions.addAll([
         fixture(61, 40),

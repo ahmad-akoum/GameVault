@@ -28,7 +28,9 @@ class TrackingControls extends StatelessWidget {
     final notInstalled =
         g.isSteam &&
         c.installations[g.appId]?.status == InstallationStatus.missing;
-    final update = g.isSteam && !notInstalled ? c.steamUpdates[g.appId] : null;
+    final verified =
+        !g.isSteam || c.installations[g.appId]?.installPath != null;
+    final update = g.isSteam && verified ? c.steamUpdates[g.appId] : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -59,7 +61,8 @@ class TrackingControls extends StatelessWidget {
               else
                 FilledButton.icon(
                   onPressed:
-                      c.running(g.appId) ||
+                      !verified ||
+                          c.running(g.appId) ||
                           c.pendingLaunches.containsKey(g.appId)
                       ? null
                       : () => c.launch(g.appId),
@@ -69,6 +72,10 @@ class TrackingControls extends StatelessWidget {
               if (notInstalled) const Text('Not Installed'),
             ],
           ),
+          if (!verified && !notInstalled && !c.running(g.appId))
+            const Text(
+              'Installation could not be verified. Use Refresh Installation in Game Settings.',
+            ),
           if (!c.running(g.appId) && update?.badge != null) ...[
             const SizedBox(height: 6),
             Text(
