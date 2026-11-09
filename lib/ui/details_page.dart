@@ -78,7 +78,9 @@ class _DetailsPageState extends State<DetailsPage> {
     super.initState();
     _lifecycle = AppLifecycleListener(onResume: _checkSteamInstallation);
     _steamCheckTimer = Timer.periodic(const Duration(seconds: 12), (_) {
-      if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+      final state = WidgetsBinding.instance.lifecycleState;
+      if (state == AppLifecycleState.resumed ||
+          state == AppLifecycleState.inactive) {
         _checkSteamInstallation();
       }
     });

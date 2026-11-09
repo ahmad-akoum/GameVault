@@ -113,6 +113,7 @@ void main() {
     await tester.pump();
     expect(find.text('Install via Steam'), findsOneWidget);
     final checks = c.installationChecks;
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
     c.nextInstallation = const InstallationEvidence(
       InstallationStatus.installed,
       'Fixture',

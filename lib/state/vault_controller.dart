@@ -296,6 +296,9 @@ class VaultController extends ChangeNotifier {
         return;
       }
       final previous = installations[id]?.status;
+      final recovered =
+          previous == InstallationStatus.missing ||
+          previous == InstallationStatus.unknown;
       installations[id] = evidence;
       if (previous != evidence.status) installationNotice = null;
       if (evidence.status == InstallationStatus.missing) storage.remove(id);
@@ -303,10 +306,8 @@ class VaultController extends ChangeNotifier {
       if (evidence.status == InstallationStatus.needsRefresh && g.isSteam) {
         await refreshInstallation(id, feedback: false);
       } else if ((evidence.installPath != null || g.isManual) &&
-          (refreshSize || previous == InstallationStatus.missing)) {
-        unawaited(
-          refreshStorage(id, force: previous == InstallationStatus.missing),
-        );
+          (refreshSize || recovered)) {
+        unawaited(refreshStorage(id, force: recovered));
       }
     } catch (_) {
       if (!_closing &&
@@ -441,8 +442,13 @@ class VaultController extends ChangeNotifier {
         error = evidence.installPath != null ? null : evidence.message;
         final selected = game(id)?.executablePath;
         if (selected != null && !await File(selected).exists()) {
-          error =
-              '${error ?? ''} The selected tracking executable is unavailable; choose its current location or use automatic detection.';
+          const hint =
+              'The selected tracking executable is unavailable. Choose its current location or use automatic detection.';
+          if (installationNotice != null) {
+            installationNotice = '$installationNotice $hint';
+          } else {
+            error = '${error ?? ''} $hint';
+          }
         }
       }
       if (evidence.status != InstallationStatus.missing) {
