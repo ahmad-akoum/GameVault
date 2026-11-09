@@ -57,7 +57,7 @@ BOOL CALLBACK VisibleWindow(HWND window, LPARAM data) {
   return TRUE;
 }
 struct Process { DWORD pid; std::wstring path; std::string token; bool visible; };
-L Snapshot(const L& games) {
+L Snapshot(const L& games, bool include_background = false) {
   if (games.empty()) return {};
   std::set<DWORD> visible;
   EnumWindows(VisibleWindow, reinterpret_cast<LPARAM>(&visible));
@@ -66,7 +66,11 @@ L Snapshot(const L& games) {
   HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
   if (snapshot == INVALID_HANDLE_VALUE) throw std::runtime_error("Process snapshot unavailable");
   PROCESSENTRY32 entry{}; entry.dwSize = sizeof(entry);
-  if (Process32First(snapshot,&entry)) do {
+  if (!Process32First(snapshot, &entry)) {
+    CloseHandle(snapshot);
+    throw std::runtime_error("Process list unavailable");
+  }
+  do {
     HANDLE handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, entry.th32ProcessID);
     if (!handle) continue;  // Protected processes are never elevated or bypassed.
     wchar_t buffer[32768]; DWORD size = 32768;
@@ -87,7 +91,8 @@ L Snapshot(const L& games) {
     L tokens; bool focused = false;
     for (const auto& process : processes) {
       bool match = !exact.empty() ? process.path == exact :
-        root.size() > 3 && process.path.compare(0,root.size()+1,root+L"\\") == 0 && process.visible && !Helper(process.path);
+        root.size() > 3 && process.path.compare(0,root.size()+1,root+L"\\") == 0 &&
+        (include_background || (process.visible && !Helper(process.path)));
       // One process can belong to only one game. Prefer an explicit path, then
       // the most specific installation root; equal matches remain untracked.
       if (match) {
@@ -172,7 +177,9 @@ GamePlatform::GamePlatform(flutter::BinaryMessenger* messenger, HWND window) : w
       } else if (call.method_name() == "sample") {
         const auto* value = Field(*args,"games"); const auto* games = value ? std::get_if<L>(value) : nullptr;
         if (!games) { result->Error("invalid_arguments","Missing game list"); return; }
-        result->Success(V(M{{V("games"),V(Snapshot(*games))},{V("idleSeconds"),V(IdleSeconds())}}));
+        const auto* background = Field(*args, "includeBackground");
+        const bool include_background = background && std::holds_alternative<bool>(*background) && std::get<bool>(*background);
+        result->Success(V(M{{V("games"),V(Snapshot(*games, include_background))},{V("idleSeconds"),V(IdleSeconds())}}));
       } else if (call.method_name() == "openLocation") {
         const auto path = Wide(Text(*args,"path"));
         if (path.size() < 3 || GetFileAttributes(path.c_str()) == INVALID_FILE_ATTRIBUTES) {
@@ -192,6 +199,18 @@ GamePlatform::GamePlatform(flutter::BinaryMessenger* messenger, HWND window) : w
           if (status <= 32) { result->Error("location_failed", "Folder could not be opened"); return; }
         }
         result->Success();
+      } else if (call.method_name() == "uninstallSteam" || call.method_name() == "installSteam") {
+        const auto id = Number(*args, "steamId");
+        if (id <= 0 || id > 0xffffffffLL) {
+          result->Error("invalid_identity", "Invalid Steam App ID");
+          return;
+        }
+        const auto target = (call.method_name() == "uninstallSteam"
+            ? L"steam://uninstall/" : L"steam://install/") + std::to_wstring(id);
+        const auto status = reinterpret_cast<INT_PTR>(
+            ShellExecuteW(nullptr, L"open", target.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
+        if (status <= 32) result->Error("steam_unavailable", "Windows could not open Steam");
+        else result->Success();
       } else if (call.method_name() == "launch" || call.method_name() == "openWeb" || call.method_name() == "openSteam" || call.method_name() == "openEpic" || call.method_name() == "openEpicLibrary") {
         std::wstring target, directory;
         if (call.method_name() == "openEpic" || call.method_name() == "openEpicLibrary") {

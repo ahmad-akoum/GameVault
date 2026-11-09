@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -7,9 +8,23 @@ import 'package:gamevault/services/steam_scanner.dart';
 import 'package:gamevault/services/steam_installation.dart';
 import 'package:gamevault/services/windows_games.dart';
 import 'package:gamevault/services/local_store.dart';
+import 'package:gamevault/services/installed_storage.dart';
+import 'package:gamevault/services/session_tracker.dart';
 import 'package:gamevault/state/vault_controller.dart';
 import 'package:gamevault/ui/details_page.dart';
 import 'services_test.dart' show TestMetadata, TestHltb;
+
+class _FixturePlatform implements GamePlatform {
+  bool running = false;
+  @override
+  Future<void> launch(VaultGame game) async {}
+  @override
+  Future<WindowsSample> sample(List<VaultGame> games) async => WindowsSample([
+    if (running)
+      for (final game in games)
+        GameObservation(game.appId, game.title, {'running'}, true),
+  ], 0);
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -40,6 +55,178 @@ void main() {
       '"AppState" { "appid" "1" "installdir" "$dir" "buildid" "123" "stateflags" "4" $extra }',
     );
   }
+
+  test(
+    'Steam dispatch is verified and profile survives removal and reinstall',
+    () async {
+      final root = p.join(temp.path, 'Steam');
+      await installed(root);
+      final profile = game(root);
+      final platform = _FixturePlatform();
+      final store = LocalStore(Directory(p.join(temp.path, 'vault')));
+      final c = VaultController(
+        store: store,
+        scanner: SteamScanner(installationRoots: () async => [root]),
+        metadata: TestMetadata(),
+        hltb: TestHltb(),
+        platform: platform,
+        storageService: InstalledStorageService(
+          File(p.join(temp.path, 'sizes.json')),
+        ),
+      );
+      addTearDown(c.dispose);
+      c.games = [profile];
+      final time = DateTime(2026, 1, 1);
+      c.tracker.sample(
+        now: time,
+        monotonicSeconds: 0,
+        games: [
+          GameObservation(1, 'Example', {'fixture'}, true),
+        ],
+        idleSeconds: 0,
+      );
+      c.tracker.closeAll('Fixture');
+      final history = c.tracker.toJson();
+      await store.save([profile], c.settings, sessions: history);
+      final calls = <MethodCall>[];
+      var fail = true;
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(WindowsGames.channel, (call) async {
+        calls.add(call);
+        if (fail) throw PlatformException(code: 'steam_unavailable');
+        return null;
+      });
+      addTearDown(
+        () => messenger.setMockMethodCallHandler(WindowsGames.channel, null),
+      );
+      expect(await c.requestSteamInstallation(0, uninstall: true), isFalse);
+      for (final unsupported in [
+        for (final source in [GameSource.local, GameSource.epic])
+          VaultGame(
+            appId: 1,
+            title: 'Unsupported',
+            installPath: root,
+            libraryPath: root,
+            source: source,
+          ),
+        VaultGame(
+          appId: 0x100000000,
+          title: 'Invalid',
+          installPath: root,
+          libraryPath: root,
+        ),
+      ]) {
+        c.games = [unsupported];
+        expect(
+          await c.requestSteamInstallation(unsupported.appId, uninstall: true),
+          isFalse,
+        );
+      }
+      c.games = [profile];
+      platform.running = true;
+      expect(await c.requestSteamInstallation(1, uninstall: true), isFalse);
+      expect(calls, isEmpty);
+      platform.running = false;
+      expect(await c.requestSteamInstallation(1, uninstall: true), isFalse);
+      expect(c.installations[1]?.status, InstallationStatus.installed);
+      fail = false;
+      expect(await c.requestSteamInstallation(1, uninstall: true), isTrue);
+      expect(calls.last.method, 'uninstallSteam');
+      expect(calls.last.arguments, {'steamId': 1});
+      // A Steam cancellation or no-op leaves the same positive evidence.
+      await c.checkInstallation(1, refreshSize: false);
+      expect(c.installations[1]?.status, InstallationStatus.installed);
+      final leftover = await File(
+        p.join(profile.installPath, 'mod.txt'),
+      ).writeAsString('Keep me');
+      expect((await c.overviewStorage(profile, refresh: true)).bytes, 7);
+      final manifest = File(p.join(root, 'steamapps', 'appmanifest_1.acf'));
+      expect(await manifest.exists(), isTrue);
+      await manifest
+          .delete(); // Fixture only, simulates Steam's record removal.
+      await c.checkInstallation(1, refreshSize: false);
+      expect(c.installations[1]?.status, InstallationStatus.missing);
+      expect((await c.overviewStorage(profile, refresh: false)).bytes, isNull);
+      expect(await leftover.readAsString(), 'Keep me');
+      expect(await c.requestSteamInstallation(1, uninstall: true), isFalse);
+      expect(await c.requestSteamInstallation(1, uninstall: false), isTrue);
+      expect(calls.last.method, 'installSteam');
+      expect(calls.last.arguments, {'steamId': 1});
+      await installed(root, dir: 'New location');
+      await c.checkInstallation(1, refreshSize: false);
+      expect(c.installations[1]?.status, InstallationStatus.installed);
+      expect(c.games.single.appId, 1);
+      expect(c.games.single.installPath, endsWith('New location'));
+      expect(c.games.single.favorite, isTrue);
+      expect(c.games.single.hltb?.main, 10);
+      expect(c.tracker.toJson(), history);
+      expect((await store.load()).sessions, history);
+      for (var i = 0; c.sizing.isNotEmpty && i < 100; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+      expect(c.sizing, isEmpty);
+      await c.shutdown();
+    },
+  );
+
+  test('an indexed AppID without its manifest remains inconclusive', () async {
+    final root = p.join(temp.path, 'Steam');
+    await Directory(p.join(root, 'steamapps')).create(recursive: true);
+    final escaped = root.replaceAll('\\', '\\\\');
+    await File(p.join(root, 'steamapps', 'libraryfolders.vdf')).writeAsString(
+      '"libraryfolders" { "0" { "path" "$escaped" "apps" { "1" "10" } } }',
+    );
+    final service = SteamInstallation(
+      SteamScanner(installationRoots: () async => [root]),
+    );
+    expect(
+      (await service.inspect(game(root), [])).status,
+      InstallationStatus.unknown,
+    );
+  });
+
+  testWidgets(
+    'cancel closes the named uninstall confirmation without dispatch',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(1100, 2600);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      final profile = game(temp.path);
+      final c = VaultController(
+        store: LocalStore(temp),
+        scanner: SteamScanner(installationRoots: () async => [temp.path]),
+        metadata: TestMetadata(),
+        hltb: TestHltb(),
+      );
+      addTearDown(c.dispose);
+      c.games = [profile];
+      c.installations[1] = InstallationEvidence(
+        InstallationStatus.installed,
+        'Fixture',
+        installPath: profile.installPath,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: DetailsPage(controller: c, id: 1, onBack: () {}),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Game Settings / Installation / Tracking'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Uninstall Game'));
+      await tester.pumpAndSettle();
+      expect(find.text('Uninstall Example?'), findsOneWidget);
+      await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+      await tester.pumpAndSettle();
+      expect(find.text('Uninstall Example?'), findsNothing);
+      expect(c.managingSteamInstallation, isEmpty);
+      expect(c.error, isNull);
+      expect(c.games.single, same(profile));
+    },
+  );
 
   test(
     'configured C/D/G library relocations are repaired without losing data',

@@ -2,6 +2,10 @@
 
 ## 2.5.1 candidate (unreleased)
 
+### Added
+- Steam-native uninstall and reinstall actions for verified Steam profiles.
+- Confirmed Not Installed status preserves the profile and excludes stale install sizes.
+
 ### Changed
 - Moved game membership editing from profiles to Manage games on the Collections page.
 

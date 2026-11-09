@@ -1,6 +1,7 @@
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import '../models/game.dart';
+import '../services/steam_installation.dart';
 import '../state/vault_controller.dart';
 
 import 'components.dart';
@@ -14,15 +15,20 @@ class TrackingControls extends StatelessWidget {
     super.key,
     required this.controller,
     required this.game,
+    this.onInstall,
     this.section = TrackingSection.summary,
   });
   final VaultController controller;
   final VaultGame game;
+  final VoidCallback? onInstall;
   final TrackingSection section;
   @override
   Widget build(BuildContext context) {
     final c = controller, g = game;
-    final update = g.isSteam ? c.steamUpdates[g.appId] : null;
+    final notInstalled =
+        g.isSteam &&
+        c.installations[g.appId]?.status == InstallationStatus.missing;
+    final update = g.isSteam && !notInstalled ? c.steamUpdates[g.appId] : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -36,6 +42,14 @@ class TrackingControls extends StatelessWidget {
                 const Chip(
                   avatar: Icon(Icons.videogame_asset_outlined, size: 18),
                   label: Text('Running'),
+                )
+              else if (notInstalled)
+                FilledButton.icon(
+                  onPressed: c.managingSteamInstallation.contains(g.appId)
+                      ? null
+                      : onInstall,
+                  icon: const Icon(Icons.download),
+                  label: const Text('Install via Steam'),
                 )
               else if (update?.badge != null)
                 SteamUpdateAction(
@@ -52,6 +66,7 @@ class TrackingControls extends StatelessWidget {
                   icon: const Icon(Icons.play_arrow),
                   label: const Text('Play Game'),
                 ),
+              if (notInstalled) const Text('Not Installed'),
             ],
           ),
           if (!c.running(g.appId) && update?.badge != null) ...[

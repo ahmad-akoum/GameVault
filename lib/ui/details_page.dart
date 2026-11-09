@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../models/game.dart';
@@ -33,9 +34,78 @@ class _DetailsPageState extends State<DetailsPage> {
   bool allSessions = false;
   bool showCandidates = false;
   late final TextEditingController query;
+  late final AppLifecycleListener _lifecycle;
+  Timer? _steamCheckTimer;
+  String? _steamRequestStatus;
+
+  Future<void> _manageSteam(VaultGame game, {required bool uninstall}) async {
+    if (uninstall) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('Uninstall ${game.title}?'),
+          content: const Text(
+            'Continuing sends a real uninstall request to Steam. Steam handles removal and any further confirmation. Your GameVault profile and history will stay in My Library.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Continue to Steam'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted || widget.id != game.appId) return;
+    }
+    final c = widget.controller;
+    final id = game.appId;
+    if (!await c.requestSteamInstallation(id, uninstall: uninstall) ||
+        !mounted ||
+        widget.id != id) {
+      return;
+    }
+    _steamCheckTimer?.cancel();
+    setState(
+      () => _steamRequestStatus = 'Checking Steam for an installation change…',
+    );
+    _steamCheckTimer = Timer.periodic(const Duration(seconds: 4), (
+      timer,
+    ) async {
+      final lastCheck = timer.tick == 8;
+      if (lastCheck) timer.cancel();
+      await c.checkInstallation(id, refreshSize: false);
+      if (!mounted || widget.id != id || _steamCheckTimer != timer) return;
+      final evidence = c.installations[id];
+      final changed = uninstall
+          ? evidence?.status == InstallationStatus.missing
+          : evidence?.installPath != null;
+      if (changed || lastCheck) {
+        timer.cancel();
+        setState(
+          () => _steamRequestStatus = changed
+              ? null
+              : 'Steam has not confirmed a change. If you completed the action, use Refresh Installation.',
+        );
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
+    _lifecycle = AppLifecycleListener(
+      onResume: () {
+        if (widget.controller.game(widget.id)?.isSteam == true) {
+          unawaited(
+            widget.controller.checkInstallation(widget.id, refreshSize: false),
+          );
+        }
+      },
+    );
     query = TextEditingController(
       text:
           widget.controller.game(widget.id)?.hltb?.title ??
@@ -57,6 +127,9 @@ class _DetailsPageState extends State<DetailsPage> {
   void didUpdateWidget(DetailsPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.id != widget.id) {
+      _steamCheckTimer?.cancel();
+      _steamCheckTimer = null;
+      _steamRequestStatus = null;
       allSessions = false;
       showCandidates = false;
       query.text =
@@ -74,6 +147,8 @@ class _DetailsPageState extends State<DetailsPage> {
 
   @override
   void dispose() {
+    _steamCheckTimer?.cancel();
+    _lifecycle.dispose();
     query.dispose();
     super.dispose();
   }
@@ -178,7 +253,11 @@ class _DetailsPageState extends State<DetailsPage> {
                   style: TextStyle(color: scheme.onSurfaceVariant),
                 ),
                 SizedBox(height: gap),
-                TrackingControls(controller: c, game: g),
+                TrackingControls(
+                  controller: c,
+                  game: g,
+                  onInstall: () => _manageSteam(g, uninstall: false),
+                ),
                 const SizedBox(height: 10),
                 Wrap(
                   spacing: 8,
@@ -289,6 +368,7 @@ class _DetailsPageState extends State<DetailsPage> {
             ),
             if (c.installations[g.appId] != null)
               Text(c.installations[g.appId]!.message),
+            if (_steamRequestStatus != null) Text(_steamRequestStatus!),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -306,6 +386,20 @@ class _DetailsPageState extends State<DetailsPage> {
                       c.openGameLocation(g.appId, executable: true),
                   child: const Text('Open EXE Location'),
                 ),
+                if (g.isSteam &&
+                    SteamInstallation.validAppId(g.appId) &&
+                    c.installations[g.appId]?.installPath != null)
+                  OutlinedButton.icon(
+                    onPressed:
+                        c.running(g.appId) ||
+                            c.pendingLaunches.containsKey(g.appId) ||
+                            c.managingSteamInstallation.contains(g.appId) ||
+                            (_steamCheckTimer?.isActive ?? false)
+                        ? null
+                        : () => _manageSteam(g, uninstall: true),
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('Uninstall Game'),
+                  ),
               ],
             ),
             if (g.isSteam) ...[

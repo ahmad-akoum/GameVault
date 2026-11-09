@@ -41,3 +41,34 @@ request would not prove that the uninstall completed.
 - [InstallScripts and uninstall hooks](https://partner.steamgames.com/doc/sdk/installscripts)
 - [Steam Cloud](https://partner.steamgames.com/doc/features/cloud)
 - [Steam stats and achievements](https://partner.steamgames.com/doc/features/achievements)
+
+## Candidate 2 implementation
+
+The profile action confirms the named game before sending the fixed native
+Steam uninstall URI through the Windows runner. The controller validates
+the Steam source and numeric AppID, checks current installation evidence,
+and checks for a running game. The runner checks the numeric AppID again.
+An accepted Windows handoff does not establish success in Steam.
+
+The profile checks Steam again when reopened or focused. A handoff starts
+up to eight additional checks, four seconds apart, while the profile is
+open. Steam cancellation or an unchanged manifest leaves the game installed.
+An unreadable library, damaged record, or library index that still lists
+the AppID without its manifest leaves the result inconclusive. The user
+can refresh manually when Steam finishes. Not Installed requires readable
+libraries without an installation record or an indexed AppID. Leftover
+folders are ignored for that decision and left on disk.
+
+Install via Steam uses the fixed Steam install URI. A verified manifest
+for the same AppID reconnects the existing profile, including when Steam
+reinstalls it to a different path. Storage Overview revalidates a game
+before counting cached bytes. Steam manages game files while the GameVault
+profile and its history remain in the vault.
+
+Tests mock the Windows handoff and change only temporary Steam manifests.
+They cover invalid IDs, unsupported launchers, running games, cancellation,
+unavailable Steam, leftover files, storage, history and reinstall. The
+actual Steam dialog and file removal still require owner acceptance with
+a specifically approved sacrificial game.
+
+- [Valve's documented native install link](https://partner.steamgames.com/doc/steamhardware/steamdeck/devkits)

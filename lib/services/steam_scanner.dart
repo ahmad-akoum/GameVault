@@ -150,6 +150,7 @@ class SteamScanner {
   Future<List<String>> discoverPaths(
     String root, [
     List<String>? warnings,
+    Set<int>? indexedApps,
   ]) async {
     final normalized = p.normalize(root);
     final library = p.basename(normalized).toLowerCase() == 'steamapps'
@@ -161,25 +162,27 @@ class SteamScanner {
       p.join(library, 'config', 'libraryfolders.vdf'),
     ]) {
       try {
-        final file = File(config);
-        if (!await file.exists()) {
-          continue;
-        }
         final value = ValveKeyValues.parse(
-          await file.readAsString(),
+          await File(config).readAsString(),
         )['libraryfolders'];
-        if (value is Map) {
-          for (final entry in value.values) {
-            final path = entry is Map ? entry['path'] : entry;
-            if (path is String &&
-                p.isAbsolute(path) &&
-                !paths.any(
-                  (e) => p.equals(e.toLowerCase(), path.toLowerCase()),
-                )) {
-              paths.add(p.normalize(path));
-            }
+        if (value is! Map) throw const FormatException('Invalid library list');
+        for (final entry in value.values) {
+          if (entry case {'apps': final Map apps}) {
+            indexedApps?.addAll(
+              apps.keys.map((id) => int.tryParse('$id')).whereType<int>(),
+            );
+          }
+          final path = entry is Map ? entry['path'] : entry;
+          if (path is String &&
+              p.isAbsolute(path) &&
+              !paths.any(
+                (e) => p.equals(e.toLowerCase(), path.toLowerCase()),
+              )) {
+            paths.add(p.normalize(path));
           }
         }
+      } on PathNotFoundException {
+        // A library does not necessarily contain the Steam client's config.
       } catch (e) {
         stderr.writeln('Library config could not be read: $e');
         warnings?.add('$config — could not read Steam library configuration.');

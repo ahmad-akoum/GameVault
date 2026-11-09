@@ -5,7 +5,7 @@ import 'steam_scanner.dart';
 
 enum InstallationStatus {
   installed('Installed'),
-  missing('Missing'),
+  missing('Not Installed'),
   needsRefresh('Needs Refresh'),
   unknown('Unknown');
 
@@ -33,6 +33,7 @@ class InstallationEvidence {
 class SteamInstallation {
   SteamInstallation(this.scanner);
   final SteamScanner scanner;
+  static bool validAppId(int id) => id > 0 && id <= 0xffffffff;
 
   /// Resolve on demand: a surviving old folder is not proof of installation.
   /// Reuse AppID/library validation rather than guessing paths or writing metadata.
@@ -69,19 +70,29 @@ class SteamInstallation {
         'Local game directory verification only.',
       );
     }
-    final queue = {
-      ...roots,
-      game.libraryPath,
-      ...await scanner.installationRoots(),
-    }.toList();
+    if (!game.isSteam || !validAppId(game.appId)) {
+      return const InstallationEvidence(
+        InstallationStatus.unknown,
+        'A valid Steam App ID is required.',
+      );
+    }
+    final steamRoots = await scanner.installationRoots();
+    final queue = {...roots, game.libraryPath, ...steamRoots}.toList();
     final visited = <String>{};
     final found = <InstallationEvidence>[];
-    var inconsistent = false;
+    final indexedApps = <int>{};
+    var inconsistent = steamRoots.isEmpty || !p.isAbsolute(game.libraryPath);
     for (var i = 0; i < queue.length; i++) {
       final root = p.normalize(queue[i]);
-      if (root.isEmpty || !visited.add(root.toLowerCase())) continue;
+      if (!p.isAbsolute(root) || !visited.add(root.toLowerCase())) continue;
       try {
-        final libraries = await scanner.discoverPaths(root);
+        final warnings = <String>[];
+        final libraries = await scanner.discoverPaths(
+          root,
+          warnings,
+          indexedApps,
+        );
+        if (warnings.isNotEmpty) inconsistent = true;
         for (final lib in libraries) {
           if (!visited.contains(p.normalize(lib).toLowerCase())) queue.add(lib);
         }
@@ -91,8 +102,15 @@ class SteamInstallation {
         final file = File(
           p.join(library, 'steamapps', 'appmanifest_${game.appId}.acf'),
         );
-        if (!await file.exists()) continue;
-        final m = ValveKeyValues.parse(await file.readAsString())['appstate'];
+        String manifest;
+        try {
+          manifest = await file.readAsString();
+        } on PathNotFoundException {
+          // An absent manifest is only meaningful on a readable library.
+          await file.parent.list().isEmpty;
+          continue;
+        }
+        final m = ValveKeyValues.parse(manifest)['appstate'];
         if (m is! Map || '${m['appid']}' != '${game.appId}') {
           inconsistent = true;
           continue;
@@ -152,16 +170,12 @@ class SteamInstallation {
         'Multiple installations were found. Resolve the duplicate in Steam before refreshing.',
       );
     }
-    final missing =
-        !await Directory(game.installPath).exists() &&
-        await Directory(p.join(game.libraryPath, 'steamapps')).exists();
+    inconsistent |= indexedApps.contains(game.appId);
     return InstallationEvidence(
-      missing && !inconsistent
-          ? InstallationStatus.missing
-          : InstallationStatus.unknown,
+      inconsistent ? InstallationStatus.unknown : InstallationStatus.missing,
       inconsistent
           ? 'Steam metadata is incomplete or inaccessible. No paths were changed.'
-          : 'No verified manifest was found. A missing manifest alone does not prove the game is uninstalled.',
+          : 'Steam has no installation record for this game in the checked libraries.',
     );
   }
 }
