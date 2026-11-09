@@ -1,3 +1,4 @@
+import '../services/steam_installation.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -290,9 +291,11 @@ class GameTile extends StatefulWidget {
     required this.onOpen,
     required this.onFavorite,
     this.update = SteamUpdateEvidence.unknown,
+    this.notInstalled = false,
   });
   final VaultGame game;
   final SteamUpdateEvidence update;
+  final bool notInstalled;
   final VoidCallback onOpen, onFavorite;
   @override
   State<GameTile> createState() => _GameTileState();
@@ -366,14 +369,35 @@ class _GameTileState extends State<GameTile> {
                       ),
                     ),
                   ),
-                if (widget.update.badge != null)
+                if (widget.notInstalled || widget.update.badge != null)
                   Positioned(
                     top: 7,
                     left: 7,
                     right: 45,
                     child: Align(
                       alignment: Alignment.topLeft,
-                      child: SteamUpdateBadge(evidence: widget.update),
+                      child: widget.notInstalled
+                          ? DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: scheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 7,
+                                  vertical: 4,
+                                ),
+                                child: Text(
+                                  'Not Installed',
+                                  style: TextStyle(
+                                    color: scheme.onSurfaceVariant,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : SteamUpdateBadge(evidence: widget.update),
                     ),
                   ),
               ],
@@ -429,9 +453,11 @@ class VaultGrid extends StatelessWidget {
     required this.onFavorite,
     this.shrinkWrap = false,
     this.updates = const {},
+    this.installations = const {},
   });
   final List<VaultGame> games;
   final Map<int, SteamUpdateEvidence> updates;
+  final Map<int, InstallationEvidence> installations;
   final ValueChanged<VaultGame> onOpen, onFavorite;
   final bool shrinkWrap;
   @override
@@ -453,6 +479,10 @@ class VaultGrid extends StatelessWidget {
         itemCount: games.length,
         itemBuilder: (_, i) => GameTile(
           game: games[i],
+          notInstalled:
+              games[i].isSteam &&
+              installations[games[i].appId]?.status ==
+                  InstallationStatus.missing,
           update: updates[games[i].appId] ?? SteamUpdateEvidence.unknown,
           onOpen: () => onOpen(games[i]),
           onFavorite: () => onFavorite(games[i]),

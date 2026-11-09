@@ -150,6 +150,7 @@ class SteamScanner {
   Future<List<String>> discoverPaths(
     String root, [
     List<String>? warnings,
+    Map<int, DateTime>? indexedApps,
   ]) async {
     final normalized = p.normalize(root);
     final library = p.basename(normalized).toLowerCase() == 'steamapps'
@@ -162,24 +163,35 @@ class SteamScanner {
     ]) {
       try {
         final file = File(config);
-        if (!await file.exists()) {
-          continue;
-        }
+        final modified = indexedApps == null ? null : await file.lastModified();
         final value = ValveKeyValues.parse(
           await file.readAsString(),
         )['libraryfolders'];
-        if (value is Map) {
-          for (final entry in value.values) {
-            final path = entry is Map ? entry['path'] : entry;
-            if (path is String &&
-                p.isAbsolute(path) &&
-                !paths.any(
-                  (e) => p.equals(e.toLowerCase(), path.toLowerCase()),
-                )) {
-              paths.add(p.normalize(path));
+        if (modified != null && await file.lastModified() != modified) {
+          throw const FormatException('Steam library list changed during read');
+        }
+        if (value is! Map) throw const FormatException('Invalid library list');
+        for (final entry in value.values) {
+          final apps = entry is Map ? entry['apps'] : null;
+          if (modified != null && indexedApps != null && apps is Map) {
+            for (final key in apps.keys) {
+              final id = int.tryParse('$key');
+              if (id != null && (indexedApps[id]?.isBefore(modified) ?? true)) {
+                indexedApps[id] = modified;
+              }
             }
           }
+          final path = entry is Map ? entry['path'] : entry;
+          if (path is String &&
+              p.isAbsolute(path) &&
+              !paths.any(
+                (e) => p.equals(e.toLowerCase(), path.toLowerCase()),
+              )) {
+            paths.add(p.normalize(path));
+          }
         }
+      } on PathNotFoundException {
+        // A library does not necessarily contain the Steam client's config.
       } catch (e) {
         stderr.writeln('Library config could not be read: $e');
         warnings?.add('$config — could not read Steam library configuration.');

@@ -1,28 +1,36 @@
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import '../models/game.dart';
+import '../services/steam_installation.dart';
 import '../state/vault_controller.dart';
 
 import 'components.dart';
 
 import 'steam_update_indicator.dart';
 
-enum TrackingSection { summary, collections, settings }
+enum TrackingSection { summary, settings }
 
 class TrackingControls extends StatelessWidget {
   const TrackingControls({
     super.key,
     required this.controller,
     required this.game,
+    this.onInstall,
     this.section = TrackingSection.summary,
   });
   final VaultController controller;
   final VaultGame game;
+  final VoidCallback? onInstall;
   final TrackingSection section;
   @override
   Widget build(BuildContext context) {
     final c = controller, g = game;
-    final update = g.isSteam ? c.steamUpdates[g.appId] : null;
+    final notInstalled =
+        g.isSteam &&
+        c.installations[g.appId]?.status == InstallationStatus.missing;
+    final verified =
+        !g.isSteam || c.installations[g.appId]?.installPath != null;
+    final update = g.isSteam && verified ? c.steamUpdates[g.appId] : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -37,6 +45,14 @@ class TrackingControls extends StatelessWidget {
                   avatar: Icon(Icons.videogame_asset_outlined, size: 18),
                   label: Text('Running'),
                 )
+              else if (notInstalled)
+                FilledButton.icon(
+                  onPressed: c.managingSteamInstallation.contains(g.appId)
+                      ? null
+                      : onInstall,
+                  icon: const Icon(Icons.download),
+                  label: const Text('Install via Steam'),
+                )
               else if (update?.badge != null)
                 SteamUpdateAction(
                   evidence: update!,
@@ -45,15 +61,21 @@ class TrackingControls extends StatelessWidget {
               else
                 FilledButton.icon(
                   onPressed:
-                      c.running(g.appId) ||
+                      !verified ||
+                          c.running(g.appId) ||
                           c.pendingLaunches.containsKey(g.appId)
                       ? null
                       : () => c.launch(g.appId),
                   icon: const Icon(Icons.play_arrow),
                   label: const Text('Play Game'),
                 ),
+              if (notInstalled) const Text('Not Installed'),
             ],
           ),
+          if (!verified && !notInstalled && !c.running(g.appId))
+            const Text(
+              'Installation could not be verified. Use Refresh Installation in Game Settings.',
+            ),
           if (!c.running(g.appId) && update?.badge != null) ...[
             const SizedBox(height: 6),
             Text(
@@ -109,34 +131,6 @@ class TrackingControls extends StatelessWidget {
                 ],
               ),
             ],
-          ),
-        ],
-        if (section == TrackingSection.collections) ...[
-          const SizedBox(height: 24),
-          const SectionTitle('Collections'),
-          if (c.settings.collections.isEmpty)
-            const Text(
-              'Create a collection from the sidebar to organize this game.',
-            ),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: c.settings.collections
-                .map(
-                  (name) => FilterChip(
-                    label: Text(name),
-                    selected: g.collections.contains(name),
-                    onSelected: (selected) => c.update(
-                      g.appId,
-                      (v) => v.copy(
-                        collections: selected
-                            ? {...v.collections, name}.toList()
-                            : v.collections.where((n) => n != name).toList(),
-                      ),
-                    ),
-                  ),
-                )
-                .toList(),
           ),
         ],
       ],

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../models/game.dart';
@@ -33,9 +34,56 @@ class _DetailsPageState extends State<DetailsPage> {
   bool allSessions = false;
   bool showCandidates = false;
   late final TextEditingController query;
+  late final AppLifecycleListener _lifecycle;
+  Timer? _steamCheckTimer;
+  void _checkSteamInstallation() {
+    if (widget.controller.game(widget.id)?.isSteam == true) {
+      unawaited(
+        widget.controller.checkInstallation(widget.id, refreshSize: false),
+      );
+    }
+  }
+
+  Future<void> _manageSteam(VaultGame game, {required bool uninstall}) async {
+    if (uninstall) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('Uninstall ${game.title}?'),
+          content: const Text(
+            'Continuing sends a real uninstall request to Steam. Steam handles removal and any further confirmation. Your GameVault profile and history will stay in My Library.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Continue to Steam'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted || widget.id != game.appId) return;
+    }
+    await widget.controller.requestSteamInstallation(
+      game.appId,
+      uninstall: uninstall,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
+    _lifecycle = AppLifecycleListener(onResume: _checkSteamInstallation);
+    _steamCheckTimer = Timer.periodic(const Duration(seconds: 12), (_) {
+      final state = WidgetsBinding.instance.lifecycleState;
+      if (state == AppLifecycleState.resumed ||
+          state == AppLifecycleState.inactive) {
+        _checkSteamInstallation();
+      }
+    });
     query = TextEditingController(
       text:
           widget.controller.game(widget.id)?.hltb?.title ??
@@ -74,6 +122,8 @@ class _DetailsPageState extends State<DetailsPage> {
 
   @override
   void dispose() {
+    _steamCheckTimer?.cancel();
+    _lifecycle.dispose();
     query.dispose();
     super.dispose();
   }
@@ -82,6 +132,8 @@ class _DetailsPageState extends State<DetailsPage> {
   Widget build(BuildContext context) {
     final c = widget.controller;
     final g = c.game(widget.id);
+    final installation = c.installations[widget.id];
+    final notInstalled = installation?.status == InstallationStatus.missing;
     if (g == null) {
       return Center(
         child: OutlinedButton(
@@ -178,7 +230,11 @@ class _DetailsPageState extends State<DetailsPage> {
                   style: TextStyle(color: scheme.onSurfaceVariant),
                 ),
                 SizedBox(height: gap),
-                TrackingControls(controller: c, game: g),
+                TrackingControls(
+                  controller: c,
+                  game: g,
+                  onInstall: () => _manageSteam(g, uninstall: false),
+                ),
                 const SizedBox(height: 10),
                 Wrap(
                   spacing: 8,
@@ -193,35 +249,38 @@ class _DetailsPageState extends State<DetailsPage> {
                           g.isEpic ? 'Open Epic Library' : 'Open in Steam',
                         ),
                       ),
-                    OutlinedButton.icon(
-                      onPressed: () => c.openGameLocation(g.appId),
-                      icon: const Icon(Icons.folder_open, size: 18),
-                      label: const Text('Open File Location'),
-                    ),
+                    if (!notInstalled)
+                      OutlinedButton.icon(
+                        onPressed: () => c.openGameLocation(g.appId),
+                        icon: const Icon(Icons.folder_open, size: 18),
+                        label: const Text('Open File Location'),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 16),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 8,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Text(
-                      'Installed size: ${c.sizing.contains(g.appId) ? 'Calculating…' : storageSize(c.storage[g.appId]?.bytes)}',
-                    ),
-                    Text(
-                      'Drive: ${c.storage[g.appId]?.drive ?? InstalledStorage(g.installPath, null, DateTime(1970)).drive}',
-                    ),
-                    TextButton.icon(
-                      onPressed: c.sizing.contains(g.appId)
-                          ? null
-                          : () => c.refreshStorage(g.appId, force: true),
-                      icon: const Icon(Icons.refresh, size: 16),
-                      label: const Text('Refresh storage'),
-                    ),
-                  ],
-                ),
-                if (c.storage[g.appId]?.message != null &&
+                if (!notInstalled)
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        'Installed size: ${c.sizing.contains(g.appId) ? 'Calculating…' : storageSize(c.storage[g.appId]?.bytes)}',
+                      ),
+                      Text(
+                        'Drive: ${c.storage[g.appId]?.drive ?? InstalledStorage(g.installPath, null, DateTime(1970)).drive}',
+                      ),
+                      TextButton.icon(
+                        onPressed: c.sizing.contains(g.appId)
+                            ? null
+                            : () => c.refreshStorage(g.appId, force: true),
+                        icon: const Icon(Icons.refresh, size: 16),
+                        label: const Text('Refresh storage'),
+                      ),
+                    ],
+                  ),
+                if (!notInstalled &&
+                    c.storage[g.appId]?.message != null &&
                     c.storage[g.appId]?.message !=
                         'Logical installed file size; links are excluded.')
                   Text(
@@ -273,22 +332,18 @@ class _DetailsPageState extends State<DetailsPage> {
               child: Text(allSessions ? 'Show less' : 'View all sessions'),
             ),
           ),
-        TrackingControls(
-          controller: c,
-          game: g,
-          section: TrackingSection.collections,
-        ),
         SizedBox(height: gap),
         ExpansionTile(
           key: const PageStorageKey('gameSettings'),
           tilePadding: EdgeInsets.zero,
           title: const Text('Game Settings / Installation / Tracking'),
           children: [
-            TrackingControls(
-              controller: c,
-              game: g,
-              section: TrackingSection.settings,
-            ),
+            if (!notInstalled)
+              TrackingControls(
+                controller: c,
+                game: g,
+                section: TrackingSection.settings,
+              ),
             Text(
               'Installation: ${c.installations[g.appId]?.status.label ?? InstallationStatus.unknown.label}',
             ),
@@ -306,29 +361,38 @@ class _DetailsPageState extends State<DetailsPage> {
                     icon: const Icon(Icons.refresh),
                     label: const Text('Refresh Installation'),
                   ),
-                OutlinedButton(
-                  onPressed: () =>
-                      c.openGameLocation(g.appId, executable: true),
-                  child: const Text('Open EXE Location'),
-                ),
+                if (!notInstalled)
+                  OutlinedButton(
+                    onPressed: () =>
+                        c.openGameLocation(g.appId, executable: true),
+                    child: const Text('Open EXE Location'),
+                  ),
+                if (g.isSteam &&
+                    SteamInstallation.validAppId(g.appId) &&
+                    c.installations[g.appId]?.installPath != null)
+                  OutlinedButton.icon(
+                    onPressed:
+                        c.running(g.appId) ||
+                            c.pendingLaunches.containsKey(g.appId) ||
+                            c.managingSteamInstallation.contains(g.appId)
+                        ? null
+                        : () => _manageSteam(g, uninstall: true),
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('Uninstall Game'),
+                  ),
               ],
             ),
-            if (g.isSteam) ...[
+            if (g.isSteam && !notInstalled) ...[
               const SizedBox(height: 16),
               const SectionTitle('Game Update Center'),
               SteamUpdatePanel(
                 showOpen: false,
-                evidence:
-                    c.steamUpdates[g.appId] ?? SteamUpdateEvidence.unknown,
+                evidence: installation?.installPath != null
+                    ? c.steamUpdates[g.appId] ?? SteamUpdateEvidence.unknown
+                    : SteamUpdateEvidence.unknown,
                 onOpen: () => c.openGameLocation(g.appId, steam: true),
                 onRefresh: () => c.refreshSteamUpdates(),
               ),
-              if (c.installations[g.appId]?.buildId != null)
-                Text('Installed build: ${c.installations[g.appId]!.buildId}'),
-              if (c.installations[g.appId]?.updated != null)
-                Text(
-                  'Steam manifest LastUpdated: ${c.installations[g.appId]!.updated!.toLocal()}',
-                ),
             ],
           ],
         ),

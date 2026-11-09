@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import '../models/game.dart';
 import 'session_tracker.dart';
+import 'steam_installation.dart';
 
 class WindowsSample {
   WindowsSample(this.games, this.idleSeconds);
@@ -59,8 +60,12 @@ class WindowsGames implements GamePlatform {
   }
 
   @override
-  Future<WindowsSample> sample(List<VaultGame> games) async {
+  Future<WindowsSample> sample(
+    List<VaultGame> games, {
+    bool includeBackground = false,
+  }) async {
     final result = await channel.invokeMapMethod<String, dynamic>('sample', {
+      if (includeBackground) 'includeBackground': true,
       'games': games
           .map(
             (g) => {
@@ -108,6 +113,19 @@ class WindowsGames implements GamePlatform {
   static Future<void> openSteam(int appId) async {
     if (appId <= 0) return;
     await channel.invokeMethod<void>('openSteam', {'steamId': appId});
+  }
+
+  static Future<void> requestSteamInstallation(
+    int appId, {
+    required bool uninstall,
+  }) async {
+    if (!SteamInstallation.validAppId(appId)) {
+      throw ArgumentError.value(appId, 'appId', 'Invalid Steam App ID');
+    }
+    await channel.invokeMethod<void>(
+      uninstall ? 'uninstallSteam' : 'installSteam',
+      {'steamId': appId},
+    );
   }
 
   static Future<void> openEpicLibrary() =>

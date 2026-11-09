@@ -91,6 +91,7 @@ class HomePage extends StatelessWidget {
         if (recentlyPlayed.isNotEmpty) ...[
           const SectionTitle('Recently played'),
           VaultGrid(
+            installations: controller.installations,
             updates: controller.steamUpdates,
             games: recentlyPlayed.take(4).toList(),
             onOpen: onOpen,
@@ -105,6 +106,7 @@ class HomePage extends StatelessWidget {
         if (playing.isNotEmpty) ...[
           const SectionTitle('In rotation'),
           VaultGrid(
+            installations: controller.installations,
             updates: controller.steamUpdates,
             games: playing.take(4).toList(),
             onOpen: onOpen,
@@ -124,6 +126,7 @@ class HomePage extends StatelessWidget {
           ),
         ),
         VaultGrid(
+          installations: controller.installations,
           updates: controller.steamUpdates,
           games: recent.take(8).toList(),
           onOpen: onOpen,
@@ -321,6 +324,7 @@ class _LibraryPageState extends State<LibraryPage> {
                     favorites: widget.favorites,
                   )
                 : VaultGrid(
+                    installations: widget.controller.installations,
                     updates: widget.controller.steamUpdates,
                     games: games,
                     onOpen: widget.onOpen,

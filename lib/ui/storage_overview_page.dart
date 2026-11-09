@@ -73,9 +73,16 @@ class _StorageOverviewPageState extends State<StorageOverviewPage> {
         final cached = await c.overviewStorage(game, refresh: false);
         if (!mounted || cancel) break;
         final key = storagePathKey(cached.path);
-        final result = refresh && cached.path.isNotEmpty
-            ? seen[key] ??= await c.overviewStorage(game, refresh: true)
-            : cached;
+        var result = cached;
+        if (refresh && !cached.notInstalled && cached.path.isNotEmpty) {
+          result = seen[key] ?? await c.overviewStorage(game, refresh: true);
+          if (!result.notInstalled &&
+              result.bytes != null &&
+              result.path.isNotEmpty &&
+              storagePathKey(result.path) == key) {
+            seen[key] = result;
+          }
+        }
         if (!mounted) break;
         setState(() {
           results[game.appId] = result;
@@ -95,11 +102,14 @@ class _StorageOverviewPageState extends State<StorageOverviewPage> {
     var stale = 0, unavailable = 0;
     for (final game in c.games) {
       final value = results[game.appId];
-      (groups[value == null || value.path.isEmpty
+      (groups[value?.notInstalled == true
+                  ? 'Not Installed'
+                  : value == null || value.path.isEmpty
                   ? 'Location unavailable'
                   : value.drive] ??=
               [])
           .add(game);
+      if (value?.notInstalled == true) continue;
       if (value?.bytes != null) {
         measured.add(value!);
         if (c.storageService?.stale(value) == true) stale++;
@@ -195,7 +205,9 @@ class _StorageOverviewPageState extends State<StorageOverviewPage> {
                     child: ListTile(
                       title: Text(game.title),
                       subtitle: Text(
-                        value?.bytes == null
+                        value?.notInstalled == true
+                            ? 'No installed size'
+                            : value?.bytes == null
                             ? value?.message ??
                                   (busy ? 'Checking…' : 'Unavailable')
                             : '${storageSize(value!.bytes)}${old ? ' · Stale' : ''}',

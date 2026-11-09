@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.5.1
+
+### Added
+- Steam-native uninstall and reinstall actions for verified Steam profiles.
+- Confirmed Not Installed status preserves the profile and excludes stale install sizes.
+
+### Changed
+- Moved game membership editing from profiles to Manage games on the Collections page.
+- Simplified the Game Update Center status and hid it for verified uninstalled games.
+
+### Fixed
+- Recognize a completed Steam uninstall when a stale library index still lists the game.
+- Show a neutral confirmation and a separate storage group for verified uninstalled games.
+- Refresh the open Steam profile automatically and show a Not Installed badge on library and collection covers.
+- Block Steam actions on conflicting manifest evidence and keep negative storage results isolated by game.
+
 ## 2.5.0
 
 ### Added

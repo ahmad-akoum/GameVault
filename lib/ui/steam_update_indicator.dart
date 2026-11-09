@@ -82,7 +82,11 @@ class SteamUpdatePanel extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Text(
-        evidence.summary,
+        evidence.pending
+            ? 'Update Available'
+            : !evidence.lastKnown && evidence.matchesRecordedTarget
+            ? 'Up to Date'
+            : 'Unknown',
         style: TextStyle(
           fontWeight: FontWeight.w600,
           color: evidence.pending && !evidence.lastKnown
@@ -93,11 +97,6 @@ class SteamUpdatePanel extends StatelessWidget {
         ),
       ),
       const SizedBox(height: 6),
-      ExpansionTile(
-        title: const Text('Update diagnostics'),
-        tilePadding: EdgeInsets.zero,
-        children: [Text('${evidence.state.label}: ${evidence.message}')],
-      ),
       if (evidence.recordedAt != null)
         Text(
           '${evidence.source} • ${evidence.recordedAt!.toLocal()}',

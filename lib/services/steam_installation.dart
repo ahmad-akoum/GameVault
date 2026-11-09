@@ -2,10 +2,11 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import '../models/game.dart';
 import 'steam_scanner.dart';
+import 'steam_updates.dart';
 
 enum InstallationStatus {
   installed('Installed'),
-  missing('Missing'),
+  missing('Not Installed'),
   needsRefresh('Needs Refresh'),
   unknown('Unknown');
 
@@ -33,6 +34,7 @@ class InstallationEvidence {
 class SteamInstallation {
   SteamInstallation(this.scanner);
   final SteamScanner scanner;
+  static bool validAppId(int id) => id > 0 && id <= 0xffffffff;
 
   /// Resolve on demand: a surviving old folder is not proof of installation.
   /// Reuse AppID/library validation rather than guessing paths or writing metadata.
@@ -59,8 +61,9 @@ class SteamInstallation {
 
   Future<InstallationEvidence> inspect(
     VaultGame game,
-    List<String> roots,
-  ) async {
+    List<String> roots, {
+    List<String>? discoveredSteamRoots,
+  }) async {
     if (game.isManual) {
       return InstallationEvidence(
         await Directory(game.installPath).exists()
@@ -69,19 +72,31 @@ class SteamInstallation {
         'Local game directory verification only.',
       );
     }
-    final queue = {
-      ...roots,
-      game.libraryPath,
-      ...await scanner.installationRoots(),
-    }.toList();
+    if (!game.isSteam || !validAppId(game.appId)) {
+      return const InstallationEvidence(
+        InstallationStatus.unknown,
+        'A valid Steam App ID is required.',
+      );
+    }
+    final steamRoots =
+        discoveredSteamRoots ?? await scanner.installationRoots();
+    final queue = {...roots, game.libraryPath, ...steamRoots}.toList();
     final visited = <String>{};
     final found = <InstallationEvidence>[];
-    var inconsistent = false;
+    final indexedApps = <int, DateTime>{};
+    var inconsistent = steamRoots.isEmpty || !p.isAbsolute(game.libraryPath);
+    var manifestConflict = false;
     for (var i = 0; i < queue.length; i++) {
       final root = p.normalize(queue[i]);
-      if (root.isEmpty || !visited.add(root.toLowerCase())) continue;
+      if (!p.isAbsolute(root) || !visited.add(root.toLowerCase())) continue;
       try {
-        final libraries = await scanner.discoverPaths(root);
+        final warnings = <String>[];
+        final libraries = await scanner.discoverPaths(
+          root,
+          warnings,
+          indexedApps,
+        );
+        if (warnings.isNotEmpty) inconsistent = true;
         for (final lib in libraries) {
           if (!visited.contains(p.normalize(lib).toLowerCase())) queue.add(lib);
         }
@@ -91,10 +106,34 @@ class SteamInstallation {
         final file = File(
           p.join(library, 'steamapps', 'appmanifest_${game.appId}.acf'),
         );
-        if (!await file.exists()) continue;
-        final m = ValveKeyValues.parse(await file.readAsString())['appstate'];
-        if (m is! Map || '${m['appid']}' != '${game.appId}') {
+        String manifest;
+        try {
+          manifest = await file.readAsString();
+        } on PathNotFoundException {
+          // An absent manifest is only meaningful on a readable library.
+          await file.parent.list().isEmpty;
+          continue;
+        } on FileSystemException {
+          // A named manifest that cannot be read is different from an
+          // unrelated library that cannot be reached.
+          final name = p.basename(file.path).toLowerCase();
+          if (await file.parent.list().any(
+            (entry) => p.basename(entry.path).toLowerCase() == name,
+          )) {
+            manifestConflict = true;
+          }
           inconsistent = true;
+          continue;
+        }
+        Object? m;
+        try {
+          m = ValveKeyValues.parse(manifest)['appstate'];
+        } on FormatException {
+          manifestConflict = true;
+          continue;
+        }
+        if (m is! Map || '${m['appid']}' != '${game.appId}') {
+          manifestConflict = true;
           continue;
         }
         final dir = m['installdir']?.toString() ?? '';
@@ -103,17 +142,22 @@ class SteamInstallation {
             dir.contains('..') ||
             dir.contains('/') ||
             dir.contains('\\')) {
-          inconsistent = true;
+          manifestConflict = true;
           continue;
         }
         final path = p.join(library, 'steamapps', 'common', dir);
         final flags = int.tryParse('${m['stateflags']}');
-        if (flags == null || (flags & 4) == 0) {
-          inconsistent = true;
+        final build = int.tryParse('${m['buildid']}') ?? 0;
+        if (flags == null ||
+            (flags & ~0x1ffff) != 0 ||
+            (flags & 4) == 0 ||
+            (flags & (1 | 32 | 128 | 2048 | 4096 | 32768)) != 0 ||
+            ((flags & (256 | 512 | 1024)) != 0 && build <= 0)) {
+          manifestConflict = true;
           continue;
         }
         if (!await Directory(path).exists()) {
-          inconsistent = true;
+          manifestConflict = true;
           continue;
         }
         if (found.any(
@@ -145,6 +189,12 @@ class SteamInstallation {
         inconsistent = true;
       }
     }
+    if (manifestConflict) {
+      return const InstallationEvidence(
+        InstallationStatus.unknown,
+        'Steam records for this App ID are incomplete or contradictory.',
+      );
+    }
     if (found.length == 1) return found.single;
     if (found.length > 1) {
       return const InstallationEvidence(
@@ -152,16 +202,17 @@ class SteamInstallation {
         'Multiple installations were found. Resolve the duplicate in Steam before refreshing.',
       );
     }
-    final missing =
-        !await Directory(game.installPath).exists() &&
-        await Directory(p.join(game.libraryPath, 'steamapps')).exists();
+    final indexedAt = indexedApps[game.appId];
+    if (!inconsistent && indexedAt != null) {
+      inconsistent = !await SteamUpdateService(
+        scanner,
+      ).confirmsUninstallAfter(game.appId, steamRoots, indexedAt);
+    }
     return InstallationEvidence(
-      missing && !inconsistent
-          ? InstallationStatus.missing
-          : InstallationStatus.unknown,
+      inconsistent ? InstallationStatus.unknown : InstallationStatus.missing,
       inconsistent
           ? 'Steam metadata is incomplete or inaccessible. No paths were changed.'
-          : 'No verified manifest was found. A missing manifest alone does not prove the game is uninstalled.',
+          : 'Steam has no installation record for this game in the checked libraries.',
     );
   }
 }

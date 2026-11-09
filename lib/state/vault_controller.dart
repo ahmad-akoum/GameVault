@@ -152,7 +152,11 @@ class VaultController extends ChangeNotifier {
     try {
       final path = await _directoryFor(g);
       final value = await storageService!.inspect(path, refresh: force);
-      if (!_closing && game(id) != null) storage[id] = value;
+      if (!_closing &&
+          game(id) != null &&
+          installations[id]?.status != InstallationStatus.missing) {
+        storage[id] = value;
+      }
     } catch (_) {
       if (!_closing && game(id) != null) {
         storage[id] = InstalledStorage(
@@ -183,8 +187,14 @@ class VaultController extends ChangeNotifier {
       );
     }
     try {
-      final path = await _directoryFor(game);
-      if (_closing || !await Directory(path).exists()) {
+      final evidence = game.isSteam ? await _inspect(game) : null;
+      if (evidence?.status == InstallationStatus.missing) {
+        return InstalledStorage('', null, service.now(), notInstalled: true);
+      }
+      final path = evidence == null
+          ? await _directoryFor(game)
+          : evidence.installPath;
+      if (_closing || path == null || !await Directory(path).exists()) {
         throw const FileSystemException('Installation is unavailable');
       }
       final value = refresh
@@ -264,32 +274,131 @@ class VaultController extends ChangeNotifier {
   bool scanning = false, importing = false, initialized = false;
   bool storageBlocked = false;
   String? error, fatalError;
+  String? installationNotice;
   String activity = '';
   final Set<int> busy = {};
   final Map<int, InstallationEvidence> installations = {};
   final Set<int> refreshingInstallation = {};
+  final Set<int> managingSteamInstallation = {};
+  final Set<int> _checkingInstallation = {};
 
-  Future<void> checkInstallation(int id) async {
+  Future<void> checkInstallation(int id, {bool refreshSize = true}) async {
     final g = game(id);
-    if (g == null || _closing) return;
+    if (g == null ||
+        _closing ||
+        refreshingInstallation.contains(id) ||
+        !_checkingInstallation.add(id)) {
+      return;
+    }
     try {
       final evidence = await _inspect(g);
-      if (_closing) return;
+      if (_closing || game(id) == null || refreshingInstallation.contains(id)) {
+        return;
+      }
+      final previous = installations[id]?.status;
+      final recovered =
+          previous == InstallationStatus.missing ||
+          previous == InstallationStatus.unknown;
       installations[id] = evidence;
+      if (previous != evidence.status) installationNotice = null;
+      if (evidence.status == InstallationStatus.missing) storage.remove(id);
       notifyListeners();
-      unawaited(refreshStorage(id));
+      if (evidence.status == InstallationStatus.needsRefresh && g.isSteam) {
+        await refreshInstallation(id, feedback: false);
+      } else if ((evidence.installPath != null || g.isManual) &&
+          (refreshSize || recovered)) {
+        unawaited(refreshStorage(id, force: recovered));
+      }
     } catch (_) {
-      /* Inconclusive evidence stays Unknown. */
+      if (!_closing &&
+          game(id) != null &&
+          !refreshingInstallation.contains(id)) {
+        installations[id] = const InstallationEvidence(
+          InstallationStatus.unknown,
+          'Steam installation could not be verified.',
+        );
+        notifyListeners();
+      }
+    } finally {
+      _checkingInstallation.remove(id);
+    }
+  }
+
+  Future<bool> requestSteamInstallation(
+    int id, {
+    required bool uninstall,
+  }) async {
+    final g = game(id);
+    if (_closing ||
+        storageBlocked ||
+        g == null ||
+        !g.isSteam ||
+        !SteamInstallation.validAppId(id) ||
+        !managingSteamInstallation.add(id)) {
+      return false;
+    }
+    try {
+      notifyListeners();
+      final evidence = await _inspect(g);
+      if (_closing || game(id) != g) return false;
+      installations[id] = evidence;
+      final verified = uninstall
+          ? evidence.installPath != null
+          : evidence.status == InstallationStatus.missing;
+      if (!verified) {
+        error =
+            'Steam installation state could not be verified for this action. Refresh Installation and try again.';
+        return false;
+      }
+      if (uninstall) {
+        if (running(id) || pendingLaunches.containsKey(id)) {
+          error = 'Close the game before asking Steam to uninstall it.';
+          return false;
+        }
+        final monitor = platform;
+        if (monitor == null) {
+          error = 'Game process verification is unavailable.';
+          return false;
+        }
+        final verifiedGame = [
+          g.copy(installPath: evidence.installPath, clearExecutable: true),
+        ];
+        final observed = await (monitor is WindowsGames
+            ? monitor.sample(verifiedGame, includeBackground: true)
+            : monitor.sample(verifiedGame));
+        if (observed.games.any(
+              (item) => item.id == id && item.processes.isNotEmpty,
+            ) ||
+            running(id) ||
+            pendingLaunches.containsKey(id)) {
+          error = 'Close the game before asking Steam to uninstall it.';
+          return false;
+        }
+      }
+      if (_closing || game(id) != g) return false;
+      await WindowsGames.requestSteamInstallation(id, uninstall: uninstall);
+      return true;
+    } catch (_) {
+      if (!_closing) {
+        error =
+            'Could not verify the game process or open Steam. Check that Steam is available, then try again.';
+      }
+      return false;
+    } finally {
+      managingSteamInstallation.remove(id);
+      if (!_closing) notifyListeners();
     }
   }
 
   Future<void> refreshInstallation(int id, {bool feedback = true}) async {
     final original = game(id);
-    if (original == null || !refreshingInstallation.add(id)) return;
+    if (original == null || _closing || !refreshingInstallation.add(id)) return;
     notifyListeners();
     try {
       final evidence = await _inspect(original);
+      if (_closing || game(id) == null) return;
       installations[id] = evidence;
+      if (evidence.status == InstallationStatus.missing) storage.remove(id);
       if (evidence.installPath != null) {
         String? relocatedExecutable;
         final oldExecutable = original.executablePath;
@@ -323,19 +432,31 @@ class VaultController extends ChangeNotifier {
           updated: evidence.updated,
         );
       }
-      if (feedback) {
-        error = evidence.installPath != null
-            ? 'Installation refreshed. Tracking executable selection preserved.'
-            : evidence.message;
+      if (feedback && evidence.status == InstallationStatus.missing) {
+        error = null;
+        installationNotice = 'Installation status confirmed: Not Installed.';
+      } else if (feedback) {
+        installationNotice = evidence.installPath != null
+            ? 'Installation status confirmed: Installed.'
+            : null;
+        error = evidence.installPath != null ? null : evidence.message;
         final selected = game(id)?.executablePath;
         if (selected != null && !await File(selected).exists()) {
-          error =
-              '${error ?? ''} The selected tracking executable is unavailable; choose its current location or use automatic detection.';
+          const hint =
+              'The selected tracking executable is unavailable. Choose its current location or use automatic detection.';
+          if (installationNotice != null) {
+            installationNotice = '$installationNotice $hint';
+          } else {
+            error = '${error ?? ''} $hint';
+          }
         }
       }
-      unawaited(refreshStorage(id, force: true));
+      if (evidence.status != InstallationStatus.missing) {
+        unawaited(refreshStorage(id, force: true));
+      }
     } catch (_) {
       if (feedback) {
+        installationNotice = null;
         error =
             'Installation could not be verified. Check that the library drive is connected.';
       }
@@ -406,6 +527,7 @@ class VaultController extends ChangeNotifier {
     }
     if (!storageBlocked) unawaited(refreshStartup());
     if (!storageBlocked && platform != null) {
+      if (platform is WindowsGames) unawaited(_loadInstallationBadges());
       _clock.start();
       _monitor = Timer.periodic(const Duration(seconds: 2), (_) => pollGames());
       unawaited(refreshSteamUpdates());
@@ -415,6 +537,29 @@ class VaultController extends ChangeNotifier {
       );
     }
     notifyListeners();
+  }
+
+  Future<void> _loadInstallationBadges() async {
+    final service = SteamInstallation(scanner);
+    try {
+      final roots = await scanner.installationRoots();
+      for (final g in List.of(games)) {
+        if (_closing) return;
+        if (!g.isSteam || installations.containsKey(g.appId)) continue;
+        final evidence = await service.inspect(
+          g,
+          settings.paths,
+          discoveredSteamRoots: roots,
+        );
+        if (_closing) return;
+        if (game(g.appId) == g && !installations.containsKey(g.appId)) {
+          installations[g.appId] = evidence;
+          if (evidence.status == InstallationStatus.missing) notifyListeners();
+        }
+      }
+    } catch (_) {
+      // Badges remain absent when Steam records cannot be read.
+    }
   }
 
   Future<bool> _commit(List<VaultGame> next, VaultSettings nextSettings) async {
@@ -669,7 +814,14 @@ class VaultController extends ChangeNotifier {
 
   Future<void> launch(int id) async {
     final g = game(id);
-    if (g == null || running(id) || pendingLaunches.containsKey(id)) return;
+    if (g == null ||
+        running(id) ||
+        pendingLaunches.containsKey(id) ||
+        managingSteamInstallation.contains(id) ||
+        (g.isSteam &&
+            installations[id]?.status == InstallationStatus.missing)) {
+      return;
+    }
     if (platform == null) {
       error = 'Game launching is available on Windows.';
       notifyListeners();
@@ -678,13 +830,26 @@ class VaultController extends ChangeNotifier {
     pendingLaunches[id] = _clock.elapsed.inSeconds + 120;
     notifyListeners();
     try {
-      if (g.isEpic || (g.isSteam && !await Directory(g.installPath).exists())) {
+      if (g.isSteam) {
+        final evidence = await _inspect(g);
+        installations[id] = evidence;
+        if (evidence.status == InstallationStatus.needsRefresh) {
+          await refreshInstallation(id, feedback: false);
+        }
+        if (installations[id]?.status != InstallationStatus.installed) {
+          throw const FileSystemException('Steam installation unavailable');
+        }
+      } else if (g.isEpic) {
         await refreshInstallation(id, feedback: false);
-        if (g.isEpic && installations[id]?.installPath == null) {
+        if (installations[id]?.installPath == null) {
           throw const FileSystemException('Epic installation unavailable');
         }
       }
-      await platform!.launch(game(id) ?? g);
+      if (_closing || game(id) == null) {
+        pendingLaunches.remove(id);
+        return;
+      }
+      await platform!.launch(game(id)!);
       if (!settings.trackingEnabled) {
         pendingLaunches.remove(id);
         notifyListeners();
@@ -817,6 +982,24 @@ class VaultController extends ChangeNotifier {
       await _commit(next, settings.copy(collections: names));
     },
   );
+  Future<void> updateCollectionMembership(
+    String name,
+    Map<int, bool> changes,
+  ) => _mutate(() async {
+    if (changes.isEmpty || !settings.collections.contains(name)) return;
+    await _commit([
+      for (final game in games)
+        if (changes[game.appId] case final selected?)
+          game.copy(
+            collections: selected
+                ? {...game.collections, name}.toList()
+                : game.collections.where((value) => value != name).toList(),
+          )
+        else
+          game,
+    ], settings);
+  });
+
   Future<void> deleteCollection(String name) => _mutate(() async {
     await _commit(
       games
@@ -909,6 +1092,7 @@ class VaultController extends ChangeNotifier {
   );
   void dismissError() {
     error = null;
+    installationNotice = null;
     notifyListeners();
   }
 

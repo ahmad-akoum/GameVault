@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gamevault/main.dart';
 import 'package:gamevault/models/game.dart';
@@ -6,10 +7,87 @@ import 'package:gamevault/services/local_store.dart';
 import 'package:gamevault/services/steam_scanner.dart';
 import 'package:gamevault/state/vault_controller.dart';
 import 'package:gamevault/ui/components.dart';
+import 'package:gamevault/ui/collections_page.dart';
 import 'package:gamevault/ui/details_page.dart';
 import 'services_test.dart' show fixtureDirectory, TestMetadata, TestHltb;
 
+class _CollectionStore extends LocalStore {
+  _CollectionStore() : super(Directory.systemTemp);
+
+  List<VaultGame>? saved;
+
+  @override
+  Future<void> save(
+    List<VaultGame> games,
+    VaultSettings settings, {
+    List<Map<String, dynamic>> sessions = const [],
+  }) async {
+    saved = games;
+  }
+}
+
 void main() {
+  testWidgets('Collections page edits membership without changing other data', (
+    tester,
+  ) async {
+    final store = _CollectionStore();
+    final c = VaultController(
+      store: store,
+      scanner: SteamScanner(installationRoots: () async => []),
+      metadata: TestMetadata(),
+      hltb: TestHltb(),
+    );
+    addTearDown(c.dispose);
+    c.settings = const VaultSettings(collections: ['Favorites list', 'Other']);
+    c.games = [
+      VaultGame(
+        appId: 1,
+        title: 'Fixture',
+        installPath: 'x',
+        libraryPath: 'x',
+        favorite: true,
+        collections: const ['Other'],
+      ),
+    ];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ListenableBuilder(
+            listenable: c,
+            builder: (_, _) => CollectionsPage(controller: c, onOpen: (_) {}),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Favorites list'));
+    await tester.pumpAndSettle();
+    Future<void> toggleMembership() async {
+      await tester.tap(find.text('Manage games'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(CheckboxListTile, 'Fixture'));
+      await tester.pumpAndSettle();
+    }
+
+    await toggleMembership();
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(store.saved, isNull);
+    expect(c.games.single.collections, ['Other']);
+
+    await toggleMembership();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(store.saved!.single.collections, ['Other', 'Favorites list']);
+    expect(c.games.single.favorite, isTrue);
+    expect(find.text('Fixture'), findsWidgets);
+
+    await toggleMembership();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(store.saved!.single.collections, ['Other']);
+    expect(find.text('Fixture'), findsNothing);
+  });
+
   testWidgets(
     'saved HLTB estimates stay visible with search and refresh available',
     (tester) async {
@@ -47,6 +125,11 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      expect(find.text('Collections'), findsNothing);
+      expect(
+        find.text('Game Settings / Installation / Tracking'),
+        findsOneWidget,
+      );
       expect(find.text('Main Story'), findsOneWidget);
       expect(
         find.textContaining('Source: HowLongToBeat • Saved HLTB title'),
