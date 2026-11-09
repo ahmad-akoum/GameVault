@@ -1,3 +1,4 @@
+import 'vault_gradient.dart';
 import 'artwork_presentation.dart';
 
 enum AppearanceMode { dark, light, system }
@@ -386,6 +387,8 @@ class VaultSettings {
     this.trackingEnabled = true,
     this.sidebarCollapsed = false,
     this.startupEnabled = false,
+    this.closeToTray = true,
+    this.gradient,
   });
   final AppearanceMode theme;
   final int accent;
@@ -395,12 +398,16 @@ class VaultSettings {
   final int idleThreshold, focusGrace;
   final bool activityAdjusted, trackingEnabled;
   final bool sidebarCollapsed, startupEnabled;
+  final bool closeToTray;
+  final VaultGradient? gradient;
   VaultSettings copy({
     AppearanceMode? theme,
     int? accent,
     int? background,
     int? surface,
     bool resetColors = false,
+    VaultGradient? gradient,
+    bool clearGradient = false,
     ProfileSize? profileSize,
     List<String>? paths,
     List<String>? collections,
@@ -410,8 +417,10 @@ class VaultSettings {
     bool? trackingEnabled,
     bool? sidebarCollapsed,
     bool? startupEnabled,
+    bool? closeToTray,
   }) => VaultSettings(
     theme: theme ?? this.theme,
+    gradient: gradient ?? (clearGradient || resetColors ? null : this.gradient),
     accent: accent ?? this.accent,
     background: resetColors ? null : background ?? this.background,
     surface: resetColors ? null : surface ?? this.surface,
@@ -424,10 +433,12 @@ class VaultSettings {
     trackingEnabled: trackingEnabled ?? this.trackingEnabled,
     sidebarCollapsed: sidebarCollapsed ?? this.sidebarCollapsed,
     startupEnabled: startupEnabled ?? this.startupEnabled,
+    closeToTray: closeToTray ?? this.closeToTray,
   );
   Map<String, dynamic> toJson() => {
     'theme': theme.name,
     'accent': accent,
+    if (gradient != null) 'gradient': gradient!.toJson(),
     if (background != null) 'background': background,
     if (surface != null) 'surface': surface,
     'profileSize': profileSize.name,
@@ -439,10 +450,12 @@ class VaultSettings {
     'trackingEnabled': trackingEnabled,
     'sidebarCollapsed': sidebarCollapsed,
     'startupEnabled': startupEnabled,
+    'closeToTray': closeToTray,
   };
   factory VaultSettings.fromJson(Map<String, dynamic> j) => VaultSettings(
     theme: AppearanceMode.values.byName(j['theme'] as String? ?? 'dark'),
     accent: j['accent'] as int? ?? 0xffb8d96e,
+    gradient: VaultGradient.fromJson(j['gradient']),
     background: _color(j['background']),
     surface: _color(j['surface']),
     profileSize:
@@ -458,5 +471,6 @@ class VaultSettings {
     trackingEnabled: j['trackingEnabled'] != false,
     sidebarCollapsed: j['sidebarCollapsed'] == true,
     startupEnabled: j['startupEnabled'] == true,
+    closeToTray: j['closeToTray'] == true,
   );
 }

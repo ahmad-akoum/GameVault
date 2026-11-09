@@ -6,9 +6,9 @@ publishes a release automatically.
 
 A local-first Flutter Windows game library: discover installed games, choose what to import, launch them, and track new play sessions.
 
-**V2.4.1 - Steam lifetime estimates and artwork positioning.**
+**V2.5.0 - Theme Studio, Windows tray and Storage Overview.**
 
-[Download the Windows release](https://github.com/ahmad-akoum/GameVault/releases/tag/v2.4.1).
+[Download the Windows release](https://github.com/ahmad-akoum/GameVault/releases/latest).
 Play Game launches normally; Update Available opens the game in Steam for manual
 update management. No automatic downloads are initiated.
 
@@ -17,13 +17,15 @@ artwork, update filtering, play-history sorting, sidebar collapse, cached storag
 details, guarded Windows startup settings, and experimental Epic discovery.
 See [release notes](docs/releases/v2.4.0.md).
 
+See the [V2.5.0 release notes](docs/releases/v2.5.0.md) for changes and upgrade instructions.
+
 ## Supported platform
 Windows x64 desktop. Flutter 3.38.5, Dart 3.10.4 and Visual Studio 2022 with Desktop development with C++ were used for validation. Android is not a supported GameVault release; prior Android build success does not establish working desktop integrations on a phone.
 
 ## Implemented features
 - Steam discovery across libraries and drives, manifest validation and non-game filtering, including Wallpaper Engine. Detection never automatically imports games.
 - Cached artwork and metadata, HowLongToBeat search, saved-match selection and refresh (independent website integration; availability and distribution permissions are not guaranteed).
-- Search, sorting, favorites, statuses, named collections and manual completion progress.
+- Search, sorting, favorites, statuses and named collections.
 - Steam/local executable launching and conservative process matching.
 - Installation refresh and folder actions across configured Steam libraries; conservative update-state badges and Open in Steam, with source/timestamp details and no automatic update downloads.
 - Independent vertical cover and widescreen profile-banner selection, local image import, preview, restore and supported Steam alternatives.

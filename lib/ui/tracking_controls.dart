@@ -4,10 +4,10 @@ import '../models/game.dart';
 import '../state/vault_controller.dart';
 
 import 'components.dart';
-import 'collections_page.dart';
+
 import 'steam_update_indicator.dart';
 
-enum TrackingSection { summary, progress, settings }
+enum TrackingSection { summary, collections, settings }
 
 class TrackingControls extends StatelessWidget {
   const TrackingControls({
@@ -32,7 +32,12 @@ class TrackingControls extends StatelessWidget {
             runSpacing: 12,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              if (update?.badge != null)
+              if (c.running(g.appId))
+                const Chip(
+                  avatar: Icon(Icons.videogame_asset_outlined, size: 18),
+                  label: Text('Running'),
+                )
+              else if (update?.badge != null)
                 SteamUpdateAction(
                   evidence: update!,
                   onOpen: () => c.openGameLocation(g.appId, steam: true),
@@ -49,28 +54,13 @@ class TrackingControls extends StatelessWidget {
                 ),
             ],
           ),
-          if (update?.badge != null) ...[
+          if (!c.running(g.appId) && update?.badge != null) ...[
             const SizedBox(height: 6),
             Text(
               'Opens this game in Steam. Start the update there manually.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
-          const SizedBox(height: 8),
-          Text(
-            c.settings.activityAdjusted
-                ? 'Statistics use active playtime.'
-                : 'Statistics use total session time.',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            c.tracker.lastPlayed(g.appId) == null
-                ? 'No GameVault sessions yet.'
-                : 'Last played ${c.tracker.lastPlayed(g.appId)!.toLocal().toString().split('.').first}',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 10),
         ],
         if (section == TrackingSection.settings) ...[
           ExpansionTile(
@@ -121,61 +111,7 @@ class TrackingControls extends StatelessWidget {
             ],
           ),
         ],
-        if (section == TrackingSection.progress) ...[
-          const SizedBox(height: 14),
-          const SectionTitle('Your progress'),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  g.progressPercent == null
-                      ? 'No personal progress set'
-                      : '${g.progressPercent}% • Manually set by you',
-                ),
-              ),
-              TextButton(
-                onPressed: () async {
-                  final value = await textPrompt(
-                    context,
-                    'Personal progress',
-                    value: g.progressPercent?.toString() ?? '',
-                    label: 'Percent (0–100)',
-                  );
-                  final percent = int.tryParse(value ?? '');
-                  if (percent != null && percent >= 0 && percent <= 100) {
-                    await c.update(
-                      g.appId,
-                      (v) => v.copy(progressPercent: percent),
-                    );
-                  } else if (value != null && context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Enter a whole number from 0 to 100.'),
-                      ),
-                    );
-                  }
-                },
-                child: const Text('Edit'),
-              ),
-              if (g.progressPercent != null)
-                TextButton(
-                  onPressed: () =>
-                      c.update(g.appId, (v) => v.copy(clearProgress: true)),
-                  child: const Text('Clear'),
-                ),
-            ],
-          ),
-          if (g.progressPercent != null)
-            LinearProgressIndicator(
-              value: g.progressPercent! / 100,
-              minHeight: 5,
-              borderRadius: BorderRadius.circular(4),
-            ),
-          const SizedBox(height: 8),
-          Text(
-            'Playtime and HowLongToBeat estimates do not determine story completion.',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
+        if (section == TrackingSection.collections) ...[
           const SizedBox(height: 24),
           const SectionTitle('Collections'),
           if (c.settings.collections.isEmpty)

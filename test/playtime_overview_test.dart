@@ -6,13 +6,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gamevault/models/game.dart';
 import 'package:gamevault/models/playtime_reconciliation.dart';
 import 'package:gamevault/services/local_store.dart';
+import 'package:gamevault/services/session_tracker.dart';
 import 'package:gamevault/services/steam_local_playtime.dart';
+import 'package:gamevault/services/steam_playtime_store.dart';
 import 'package:gamevault/services/steam_scanner.dart';
 import 'package:gamevault/state/vault_controller.dart';
 import 'package:gamevault/ui/activity_pages.dart';
 import 'package:gamevault/ui/playtime_overview.dart';
 import 'package:gamevault/ui/session_presentation.dart';
 import 'package:gamevault/ui/theme.dart';
+import 'package:gamevault/ui/tracking_controls.dart';
 import 'steam_playtime_test.dart' show Fixture;
 import 'playtime_reconciliation_test.dart' show session;
 import 'services_test.dart' show TestMetadata, TestHltb;
@@ -61,6 +64,105 @@ void main() {
     );
     await p.reconciliation.accept(proposal, c.tracker.sessions);
     await c.refreshPlaytime();
+  }
+
+  testWidgets(
+    'running profile shows live active and inactive seconds and returns to Play on exit',
+    (tester) async {
+      c.tracker.sessions.clear();
+      final game = c.games.single;
+      void sample(int elapsed, {bool running = true, bool focused = true}) {
+        c.tracker.sample(
+          now: f.clock.add(Duration(seconds: elapsed)),
+          monotonicSeconds: elapsed,
+          games: running
+              ? [
+                  GameObservation(game.appId, game.title, {'fixture'}, focused),
+                ]
+              : [],
+          idleSeconds: 0,
+          focusGrace: 0,
+        );
+      }
+
+      Future<void> render() => tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ListView(
+              children: [
+                TrackingControls(controller: c, game: game),
+                PlaytimeOverview(controller: c, game: game),
+              ],
+            ),
+          ),
+        ),
+      );
+      sample(0);
+      sample(2);
+      sample(5, focused: false);
+      await render();
+      expect(find.text('Running'), findsOneWidget);
+      expect(find.text('2s'), findsOneWidget);
+      expect(find.text('3s'), findsOneWidget);
+      sample(6, running: false);
+      await render();
+      expect(find.text('Play Game'), findsOneWidget);
+      expect(find.text('2s'), findsOneWidget);
+      expect(find.text('3s'), findsOneWidget);
+      expect(c.tracker.sessions.single.open, isFalse);
+    },
+  );
+
+  for (final accepting in [false, true]) {
+    test(
+      'shutdown drains ${accepting ? "baseline acceptance" : "account confirmation"} and seals writes',
+      () async {
+        final p = c.playtime!;
+        if (accepting) await confirm();
+        final account = await f.proposal();
+        final proposal = accepting
+            ? await p.reconciliation.proposeManualHistorical(
+                11,
+                c.tracker.sessions,
+                historicalSeconds: 1234,
+              )
+            : null;
+        final before = jsonEncode(c.tracker.toJson());
+        final started = Completer<void>(), gate = Completer<void>();
+        f.overrideRead = (path) async {
+          if (path.endsWith('loginusers.vdf')) {
+            if (!started.isCompleted) started.complete();
+            await gate.future;
+          }
+          return readSteamDocument(path);
+        };
+        final mutation = accepting
+            ? p.reconciliation.accept(proposal!, c.tracker.sessions)
+            : p.confirm(account, c.steamAppIds);
+        await started.future.timeout(const Duration(seconds: 5));
+        var closed = false;
+        final closing = p.close().then((_) => closed = true);
+        await expectLater(
+          f.service.confirmAccount(account),
+          throwsA(isA<SteamPlaytimeStorageFailure>()),
+        );
+        expect(closed, false);
+        gate.complete();
+        await mutation;
+        await closing;
+        final saved = await SteamPlaytimeStore(f.profile).load();
+        expect(saved.confirmedAccount?.steamId64, f.first.steamId64);
+        if (accepting) {
+          expect(saved.baselines.values.single.single.historicalSeconds, 1234);
+        }
+        expect(jsonEncode(c.tracker.toJson()), before);
+        await expectLater(
+          f.store.update((data) async => (data, true)),
+          throwsA(isA<SteamPlaytimeStorageFailure>()),
+        );
+        await p.close(); // Repeated shutdown is harmless.
+      },
+    );
   }
 
   test(

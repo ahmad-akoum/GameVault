@@ -322,7 +322,11 @@ void main() {
           (await service.inspect(p.join(dir.path, 'missing'))).bytes,
           isNull,
         );
-        expect(storageSize(1500000000), '1.50 GB');
+        expect(storageSize(1500000000), '1.40 GB');
+        expect(storageSize(1023), '1023 B');
+        expect(storageSize(1024), '1.0 KB');
+        expect(storageSize(1 << 20), '1.0 MB');
+        expect(storageSize(1 << 30), '1.00 GB');
         expect(storageSize(null), 'Unavailable');
         expect(
           InstalledStorage(r'G:\Games\Example', 0, DateTime(2026)).drive,

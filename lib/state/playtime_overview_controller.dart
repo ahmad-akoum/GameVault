@@ -235,10 +235,12 @@ class PlaytimeOverviewController extends ChangeNotifier {
 
   Future<void> close() async {
     _closing = true;
+    final mutations = steam.store.close();
     // Drain reads before releasing the profile or deleting a disposable vault.
     // A queued follow-up sees _closing and cannot start another cache job.
     await _queuedRefresh;
     await _loading;
+    await mutations;
   }
 
   @override

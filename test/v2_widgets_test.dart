@@ -139,33 +139,9 @@ void main() {
             .first,
       );
       await tester.pumpAndSettle();
-      expect(
-        find.text('Playtime Overview'),
-        findsOneWidget,
-      );
+      expect(find.text('Playtime Overview'), findsOneWidget);
       expect(tester.takeException(), isNull);
-      await tester.scrollUntilVisible(
-        find.text('Your progress'),
-        200,
-        scrollable: find
-            .descendant(
-              of: find.byType(DetailsPage),
-              matching: find.byType(Scrollable),
-            )
-            .first,
-      );
-      await tester.pumpAndSettle();
-      await tester.runAsync(() async {
-        await tester.tap(find.text('Edit'));
-        await tester.pumpAndSettle();
-        await tester.enterText(find.byType(TextFormField), '25');
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Save'));
-        await tester.pumpAndSettle();
-        await Future<void>.delayed(const Duration(milliseconds: 200));
-      });
-      await tester.pumpAndSettle();
-      expect(c.games.single.progressPercent, 25);
+      expect(find.text('Your progress'), findsNothing);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
       await tester.runAsync(c.shutdown);

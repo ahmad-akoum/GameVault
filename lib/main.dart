@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:window_manager/window_manager.dart';
 import 'models/game.dart';
@@ -22,6 +23,7 @@ import 'ui/vault_shell.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await windowManager.ensureInitialized();
+  await windowManager.setPreventClose(true);
   const options = WindowOptions(
     size: Size(1280, 840),
     minimumSize: Size(360, 620),
@@ -60,8 +62,9 @@ Future<void> main() async {
       SteamPlaytimeStore(directory),
     ),
   );
-  runApp(GameVaultApp(controller: controller));
-  await controller.initialize();
+  final initialization = controller.initialize();
+  runApp(GameVaultApp(controller: controller, initialization: initialization));
+  await initialization;
 }
 
 class GameVaultApp extends StatefulWidget {
@@ -69,20 +72,29 @@ class GameVaultApp extends StatefulWidget {
     super.key,
     required this.controller,
     this.manageWindow = true,
+    this.initialization,
   });
   final VaultController controller;
   final bool manageWindow;
+  final Future<void>? initialization;
   @override
   State<GameVaultApp> createState() => _GameVaultAppState();
 }
 
 class _GameVaultAppState extends State<GameVaultApp> with WindowListener {
+  static const _tray = MethodChannel('gamevault/tray');
+  Future<void>? _exit;
+  bool _handlingClose = false;
+  String? _exitSaveError;
   @override
   void initState() {
     super.initState();
     if (widget.manageWindow) {
       windowManager.addListener(this);
       unawaited(windowManager.setPreventClose(true));
+      _tray.setMethodCallHandler((call) async {
+        if (call.method == 'exit') await _exitGameVault();
+      });
     }
   }
 
@@ -90,15 +102,51 @@ class _GameVaultAppState extends State<GameVaultApp> with WindowListener {
   void dispose() {
     if (widget.manageWindow) {
       windowManager.removeListener(this);
+      _tray.setMethodCallHandler(null);
     }
     super.dispose();
   }
 
   @override
   Future<void> onWindowClose() async {
-    // Pending saves finish before releasing the data lock; enrichment can be
-    // retried later and never blocks closing the window.
-    await widget.controller.shutdown();
+    if (_handlingClose || _exit != null) return;
+    _handlingClose = true;
+    try {
+      await widget.initialization;
+      if (_exit != null) return;
+      if (_exitSaveError == null &&
+          !widget.controller.storageBlocked &&
+          widget.controller.settings.closeToTray) {
+        try {
+          if (await _tray.invokeMethod<bool>('hide') == true) return;
+        } on PlatformException {
+          // If the tray is unavailable, take the normal exit path.
+        } on MissingPluginException {
+          // A runner without tray support still closes safely.
+        }
+      }
+      await _exitGameVault();
+    } finally {
+      _handlingClose = false;
+    }
+  }
+
+  Future<void> _exitGameVault() => _exit ??= _shutdown();
+
+  Future<void> _shutdown() async {
+    await widget.initialization;
+    try {
+      await widget.controller.shutdown();
+    } on StorageFailure catch (e) {
+      if (mounted) setState(() => _exitSaveError = e.message);
+      try {
+        await windowManager.show();
+        await windowManager.focus();
+      } finally {
+        _exit = null;
+      }
+      return;
+    }
     await windowManager.destroy();
   }
 
@@ -184,7 +232,36 @@ class _GameVaultAppState extends State<GameVaultApp> with WindowListener {
                         ),
                       ),
                     ),
-                    Expanded(child: VaultShell(controller: widget.controller)),
+                    Expanded(
+                      child: _exitSaveError == null
+                          ? VaultShell(controller: widget.controller)
+                          : Material(
+                              child: Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(24),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Text(
+                                        'Could not save the final session',
+                                      ),
+                                      Text(_exitSaveError!),
+                                      const Text(
+                                        'Tracking has stopped. Check available disk space and vault access, then retry saving and exiting.',
+                                      ),
+                                      const SizedBox(height: 16),
+                                      FilledButton(
+                                        onPressed: _exitGameVault,
+                                        child: const Text(
+                                          'Retry Save and Exit',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                    ),
                   ],
                 )
               : VaultShell(controller: widget.controller),

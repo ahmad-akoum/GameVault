@@ -92,6 +92,14 @@ class SteamPlaytimeStore {
   final File file;
   File get _backup => File('${file.path}.bak');
   Future<void> _tail = Future.value();
+  bool _closing = false;
+
+  /// Seal synchronously, then drain mutations already admitted to the queue.
+  Future<void> close() {
+    _closing = true;
+    return _tail;
+  }
+
   static int _serial = 0;
 
   Future<SteamPlaytimeData> _decode(File source) async {
@@ -148,6 +156,9 @@ class SteamPlaytimeStore {
   Future<T> update<T>(
     Future<(SteamPlaytimeData, T)> Function(SteamPlaytimeData) change,
   ) {
+    if (_closing) {
+      return Future<T>.error(const SteamPlaytimeStorageFailure());
+    }
     final task = _tail.then((_) async {
       RandomAccessFile? lock;
       var locked = false;

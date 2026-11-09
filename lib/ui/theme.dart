@@ -1,4 +1,25 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../models/vault_gradient.dart';
+
+LinearGradient? vaultBackdrop(ThemeData theme, VaultGradient? settings) {
+  if (settings == null || settings.intensity == 0) return null;
+  final angle = settings.direction * math.pi / 180;
+  final end = Alignment(math.cos(angle), math.sin(angle));
+  return LinearGradient(
+    begin: Alignment(-end.x, -end.y),
+    end: end,
+    colors: settings.colors
+        .map(
+          (color) => Color.lerp(
+            theme.colorScheme.surface,
+            appearanceSurface(color, theme.brightness),
+            settings.intensity,
+          )!,
+        )
+        .toList(),
+  );
+}
 
 // Custom hues adapt to the selected mode so every surface remains readable.
 Color appearanceSurface(int value, Brightness brightness) {

@@ -66,10 +66,12 @@ website access controls to restore it.
 
 ## V2.4 candidate and artifact locations
 
-V2.4.0+17 is installed at the usual stable Release path, upgraded from the
-verified official-build package with the owner's latest personalized V2.4 vault.
-The owner has approved V2.4 publication and PR #23 merge. The complete V2.3 runtime/vault is
-preserved under `previous_versions/v2.3.0/Release` and in a private verified backup.
+V2.4.1+20 is installed at the canonical stable Release path from the verified
+official GitHub ZIP. The latest canonical vault was retained, including sessions
+recorded after candidate copies. Only the compatible Steam playtime sidecar was
+transferred from Phase 4 with explicit owner approval. The complete V2.4.0
+runtime/current vault is archived under `previous_versions/v2.4.0/Release` and
+in an independent verified private backup. The earlier V2.3 archive is preserved.
 Develop only in an isolated candidate under `development_artifacts/candidates`,
 with a separately copied vault. Keep earlier artifacts and backups intact. Use the private build helper
 with `-Candidate`; candidate startup-registration changes must stay disabled.
@@ -97,7 +99,11 @@ unrelated existing features unless the owner asks.
 
 The newest stable Windows application must always be installed at
 `build/windows/x64/runner/Release/gamevault.exe` relative to this project root
-(the owner's usual Release folder). For every approved stable-version upgrade:
+(the owner's canonical local stable installation). After successful GitHub
+publication, upgrade this exact installation unless the owner explicitly instructs
+otherwise for that release. Publication or a candidate executable alone is not
+proof that the canonical installation was upgraded: verify its actual version.
+For every approved stable-version upgrade:
 
 - Close GameVault. Before replacing files, make a separate private backup of
   the current Release `vault_data` and verify every file by relative path and
@@ -114,6 +120,11 @@ The newest stable Windows application must always be installed at
 - Copy the official runtime files into the usual Release folder while leaving
   `vault_data` untouched. Never merge or replace it with Debug, V1, or another
   installation's data. Do not run `flutter clean` for an installation.
+- Treat the latest canonical vault as authoritative, including sessions newer
+  than candidate copies. If an accepted Steam baseline exists only in a candidate,
+  check its account and frozen session checkpoints against the current vault and
+  ask before importing only that sidecar. Never copy an older vault over newer
+  sessions or silently create/revise an accepted historical baseline.
 - Verify the installed executable's version, compare the installed runtime
   files with the official package, and confirm `vault_data` still matches the
   pre-upgrade backup. Keep archives and backups private and out of Git.
@@ -204,3 +215,17 @@ publication after approval.
 
 Carry these release instructions into the reviewed publishing source when
 preparing future versions, without copying private development records.
+
+## Personal testing candidates
+
+For hands-on owner testing, locate the current canonical stable vault and
+confirm stable GameVault has exited before copying it. Make a new, independent
+snapshot outside the runtime and packaging inputs. Verify every relative file
+path and SHA-256, including artwork, preferences, sessions and sidecars.
+Check that artwork references resolve inside the copy and that no links
+redirect writes to stable. Provide a clearly named launcher that sets
+GAMEVAULT_DATA_DIR only for that candidate process and refuses to launch if
+the verified test vault is missing. Give the owner its exact path.
+If the copy cannot be verified, stop and report the issue. Keep all candidate
+data private and Git-ignored. Never merge candidate changes into the original
+stable vault. Automated tests may continue using disposable fixture vaults.

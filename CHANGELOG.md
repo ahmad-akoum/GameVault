@@ -1,5 +1,31 @@
 # Changelog
 
+## 2.5.0
+
+### Added
+- Theme Studio with visual color selection, editable multi-color gradients,
+  live preview, appearance modes, and draft Apply/Cancel.
+- Optional Windows close-to-tray tracking with Open and Exit actions.
+- Read-only Storage Overview grouped by drive with cached sizes and refresh
+  progress.
+
+### Changed
+- Replaced manual percentage controls with existing status and collection
+  workflows, preserving legacy values in stored records.
+- Moved Last played beside Recent sessions and moved overlap details into
+  Playtime information. Measured active and inactive rows display seconds.
+- Profiles display Running while a game is observed, with more separation between the primary action and launcher/location buttons.
+
+### Fixed
+- Display installation sizes using binary Windows-style units while preserving
+  measured byte counts.
+
+- Shutdown now drains pending Steam account-confirmation and baseline writes
+  and rejects new sidecar mutations once closing begins.
+
+- Keep the final session retryable if saving fails during Exit, and show a retry action.
+- Keep cleared custom theme colors at their defaults when applying a partial edit.
+
 ## 2.4.1
 
 ### Added

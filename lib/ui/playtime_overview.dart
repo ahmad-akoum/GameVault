@@ -133,12 +133,6 @@ class PlaytimeOverview extends StatelessWidget {
           p.detection?.proposal != null &&
           (p.data.confirmedAccount == null || p.accountMatches))
         'Steam lifetime is unavailable. Adjust can use manual historical-only time.',
-      if (g.isSteam &&
-          snapshot?.lifetimeMinutes != null &&
-          provisional == null &&
-          baseline == null &&
-          snapshot!.lifetimeMinutes! * 60 < total)
-        'Steam lifetime is below tracked runtime. Full overlap cannot be assumed; Adjust or refresh after Steam synchronizes.',
       if (p?.message != null && g.isSteam) p!.message!,
     };
     Widget row(String label, String value) => Padding(
@@ -209,11 +203,11 @@ class PlaytimeOverview extends StatelessWidget {
           ),
           row(
             'GameVault active',
-            unknown ? 'Unknown' : overviewDuration(active),
+            unknown ? 'Unknown' : sessionDuration(active),
           ),
           row(
             'GameVault inactive',
-            unknown ? 'Unknown' : overviewDuration(total - active),
+            unknown ? 'Unknown' : sessionDuration(total - active),
           ),
           row(
             'Historical adjustment',
@@ -323,6 +317,12 @@ class PlaytimeInformation extends StatelessWidget {
                     'No accepted baseline. A provisional full-overlap estimate can change with cached Steam data; use Adjust to review and accept history.',
                   ),
                 if (snapshot != null) ...[
+                  if (b == null &&
+                      snapshot.lifetimeMinutes != null &&
+                      snapshot.lifetimeMinutes! * 60 < c.tracker.total(id))
+                    item(
+                      'Steam lifetime is below tracked runtime. Full overlap cannot be assumed; Adjust or refresh after Steam synchronizes.',
+                    ),
                   item('Source: Steam local cache (minute precision)'),
                   item(
                     'Retrieved: ${snapshot.retrievedAt.toLocal().toString().split('.').first}',

@@ -321,7 +321,10 @@ void main() {
         );
         await tester.pumpAndSettle();
         final toggle = tester.widget<SwitchListTile>(
-          find.byType(SwitchListTile).first,
+          find.widgetWithText(
+            SwitchListTile,
+            'Launch GameVault when Windows starts',
+          ),
         );
         expect(toggle.value, false);
         expect(toggle.onChanged, isNull);
