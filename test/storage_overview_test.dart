@@ -21,12 +21,14 @@ class _StorageController extends VaultController {
 
   final measurement = Completer<InstalledStorage>();
   final refreshed = <int>[];
+  Map<int, InstalledStorage>? fixture;
 
   @override
   Future<InstalledStorage> overviewStorage(
     VaultGame game, {
     required bool refresh,
   }) async {
+    if (fixture != null) return fixture![game.appId]!;
     if (refresh) {
       refreshed.add(game.appId);
       return measurement.future;
@@ -36,6 +38,43 @@ class _StorageController extends VaultController {
 }
 
 void main() {
+  testWidgets(
+    'verified uninstalled games have their own group until reinstalled',
+    (tester) async {
+      final c = _StorageController();
+      addTearDown(c.dispose);
+      final now = DateTime.utc(2026);
+      const path = 'D:/Games/Fixture';
+      c.games = [
+        VaultGame(
+          appId: 1,
+          title: 'Fixture',
+          installPath: path,
+          libraryPath: 'D:/Games',
+        ),
+      ];
+      c.fixture = {1: InstalledStorage('', null, now, notInstalled: true)};
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: StorageOverviewPage(controller: c, onOpen: (_) {}),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Not Installed'), findsOneWidget);
+      expect(find.text('No installed size'), findsOneWidget);
+      expect(find.text('0 measured · 0 stale · 0 unavailable'), findsOneWidget);
+      expect(find.text('Location unavailable'), findsNothing);
+
+      c.fixture![1] = InstalledStorage(path, 1 << 30, now);
+      await tester.tap(find.text('Refresh sizes'));
+      await tester.pumpAndSettle();
+      expect(find.text('Not Installed'), findsNothing);
+      expect(find.text('1 measured · 0 stale · 0 unavailable'), findsOneWidget);
+      expect(find.text('1.00 GB'), findsNWidgets(2));
+    },
+  );
   test('tracked sizes count shared and nested folders once, across drives', () {
     InstalledStorage size(String path, int? bytes) =>
         InstalledStorage(path, bytes, DateTime.utc(2026));

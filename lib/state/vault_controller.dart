@@ -187,8 +187,14 @@ class VaultController extends ChangeNotifier {
       );
     }
     try {
-      final path = await _directoryFor(game);
-      if (_closing || !await Directory(path).exists()) {
+      final evidence = game.isSteam ? await _inspect(game) : null;
+      if (evidence?.status == InstallationStatus.missing) {
+        return InstalledStorage('', null, service.now(), notInstalled: true);
+      }
+      final path = evidence == null
+          ? await _directoryFor(game)
+          : evidence.installPath;
+      if (_closing || path == null || !await Directory(path).exists()) {
         throw const FileSystemException('Installation is unavailable');
       }
       final value = refresh
@@ -268,6 +274,7 @@ class VaultController extends ChangeNotifier {
   bool scanning = false, importing = false, initialized = false;
   bool storageBlocked = false;
   String? error, fatalError;
+  String? installationNotice;
   String activity = '';
   final Set<int> busy = {};
   final Map<int, InstallationEvidence> installations = {};
@@ -428,7 +435,11 @@ class VaultController extends ChangeNotifier {
           updated: evidence.updated,
         );
       }
-      if (feedback) {
+      if (feedback && evidence.status == InstallationStatus.missing) {
+        error = null;
+        installationNotice = 'Installation status confirmed: Not Installed.';
+      } else if (feedback) {
+        installationNotice = null;
         error = evidence.installPath != null
             ? 'Installation refreshed. Tracking executable selection preserved.'
             : evidence.message;
@@ -438,9 +449,12 @@ class VaultController extends ChangeNotifier {
               '${error ?? ''} The selected tracking executable is unavailable; choose its current location or use automatic detection.';
         }
       }
-      unawaited(refreshStorage(id, force: true));
+      if (evidence.status != InstallationStatus.missing) {
+        unawaited(refreshStorage(id, force: true));
+      }
     } catch (_) {
       if (feedback) {
+        installationNotice = null;
         error =
             'Installation could not be verified. Check that the library drive is connected.';
       }
@@ -778,7 +792,8 @@ class VaultController extends ChangeNotifier {
         running(id) ||
         pendingLaunches.containsKey(id) ||
         managingSteamInstallation.contains(id) ||
-        (g.isSteam && installations[id]?.status == InstallationStatus.missing)) {
+        (g.isSteam &&
+            installations[id]?.status == InstallationStatus.missing)) {
       return;
     }
     if (platform == null) {
@@ -1038,6 +1053,7 @@ class VaultController extends ChangeNotifier {
   );
   void dismissError() {
     error = null;
+    installationNotice = null;
     notifyListeners();
   }
 

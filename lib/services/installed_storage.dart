@@ -4,7 +4,14 @@ import 'dart:isolate';
 import 'package:path/path.dart' as p;
 
 class InstalledStorage {
-  const InstalledStorage(this.path, this.bytes, this.checkedAt, {this.message});
+  const InstalledStorage(
+    this.path,
+    this.bytes,
+    this.checkedAt, {
+    this.message,
+    this.notInstalled = false,
+  });
+  final bool notInstalled;
   final String path;
   final int? bytes;
   final DateTime checkedAt;

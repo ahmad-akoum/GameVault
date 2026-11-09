@@ -147,7 +147,15 @@ void main() {
           .delete(); // Fixture only, simulates Steam's record removal.
       await c.checkInstallation(1, refreshSize: false);
       expect(c.installations[1]?.status, InstallationStatus.missing);
-      expect((await c.overviewStorage(profile, refresh: false)).bytes, isNull);
+      await c.refreshInstallation(1);
+      expect(c.error, isNull);
+      expect(
+        c.installationNotice,
+        'Installation status confirmed: Not Installed.',
+      );
+      final removedStorage = await c.overviewStorage(profile, refresh: false);
+      expect(removedStorage.notInstalled, isTrue);
+      expect(removedStorage.bytes, isNull);
       expect(await leftover.readAsString(), 'Keep me');
       expect(await c.requestSteamInstallation(1, uninstall: true), isFalse);
       expect(await c.requestSteamInstallation(1, uninstall: false), isTrue);
@@ -158,6 +166,10 @@ void main() {
       expect(c.installations[1]?.status, InstallationStatus.installed);
       expect(c.games.single.appId, 1);
       expect(c.games.single.installPath, endsWith('New location'));
+      expect(
+        (await c.overviewStorage(c.games.single, refresh: false)).notInstalled,
+        isFalse,
+      );
       expect(c.games.single.favorite, isTrue);
       expect(c.games.single.hltb?.main, 10);
       expect(c.tracker.toJson(), history);

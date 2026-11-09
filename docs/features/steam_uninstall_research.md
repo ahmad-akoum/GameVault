@@ -87,3 +87,9 @@ for verified uninstalled Steam games. Unknown disables Play and suppresses
 stale update claims. The update center keeps its Steam action and refresh
 control. Up to Date is reserved for live Steam evidence of a matching
 recorded target build; other inconclusive evidence displays Unknown.
+
+Candidate 4 presents verified absence as a neutral installation notice.
+Storage Overview rechecks the installation and groups verified uninstalled
+games separately from unavailable locations. Those games have no measured
+size and do not count as failed measurements. Refreshing after reinstall
+returns the game to its drive group. Fixture coverage checks both states.

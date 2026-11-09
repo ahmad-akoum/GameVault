@@ -237,22 +237,30 @@ class _VaultShellState extends State<VaultShell> {
                     color: scheme.secondaryContainer,
                     child: Text(c.trackingError!),
                   ),
-                if (c.error != null)
+                if (c.error != null || c.installationNotice != null)
                   Container(
-                    color: scheme.errorContainer,
+                    color: c.error == null
+                        ? scheme.secondaryContainer
+                        : scheme.errorContainer,
                     padding: const EdgeInsets.fromLTRB(20, 8, 8, 8),
                     child: Row(
                       children: [
                         Icon(
                           Icons.info_outline,
                           size: 18,
-                          color: scheme.onErrorContainer,
+                          color: c.error == null
+                              ? scheme.onSecondaryContainer
+                              : scheme.onErrorContainer,
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            c.error!,
-                            style: TextStyle(color: scheme.onErrorContainer),
+                            c.error ?? c.installationNotice!,
+                            style: TextStyle(
+                              color: c.error == null
+                                  ? scheme.onSecondaryContainer
+                                  : scheme.onErrorContainer,
+                            ),
                           ),
                         ),
                         IconButton(
