@@ -79,6 +79,58 @@ class CollectionsPage extends StatefulWidget {
 
 class _CollectionsPageState extends State<CollectionsPage> {
   String? selected;
+
+  Future<void> _manageGames(String name) async {
+    final c = widget.controller;
+    final games = List.of(c.games);
+    final initial = {
+      for (final game in games) game.appId: game.collections.contains(name),
+    };
+    final draft = Map.of(initial);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('Games in $name'),
+          content: SizedBox(
+            width: 420,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final game in games)
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(game.title),
+                      value: draft[game.appId],
+                      onChanged: (value) => setDialogState(
+                        () => draft[game.appId] = value == true,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await c.updateCollectionMembership(name, {
+      for (final entry in draft.entries)
+        if (entry.value != initial[entry.key]) entry.key: entry.value,
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = widget.controller;
@@ -124,6 +176,13 @@ class _CollectionsPageState extends State<CollectionsPage> {
         if (selected != null)
           AdaptiveRow(
             children: [
+              TextButton.icon(
+                icon: const Icon(Icons.checklist, size: 16),
+                label: const Text('Manage games'),
+                onPressed: c.games.isEmpty
+                    ? null
+                    : () => _manageGames(selected!),
+              ),
               TextButton.icon(
                 icon: const Icon(Icons.edit_outlined, size: 16),
                 label: const Text('Rename'),
@@ -174,7 +233,7 @@ class _CollectionsPageState extends State<CollectionsPage> {
           child: games.isEmpty
               ? const Center(
                   child: Text(
-                    'Add games to this collection from their detail pages.',
+                    'Use Manage games to add games to this collection.',
                   ),
                 )
               : VaultGrid(

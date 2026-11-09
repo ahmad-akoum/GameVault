@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.5.1 candidate (unreleased)
+
+### Changed
+- Moved game membership editing from profiles to Manage games on the Collections page.
+
 ## 2.5.0
 
 ### Added

@@ -25,3 +25,10 @@ games. GameVault displays Running and leaves normal exit to the game.
 Profile tests cover the running-to-exited transition and exact active/inactive
 seconds. Reconciliation tests continue to cover baseline immutability on
 refresh, including counter decreases and missing snapshots.
+
+V2.5.1 removes the separate Collections section from game profiles. To
+change membership, select a collection in the sidebar's Collections page and
+choose Manage games. The dialog saves only changed memberships in one vault
+write through VaultController.updateCollectionMembership. Cancel leaves
+memberships unchanged. Widget coverage checks Cancel, add and remove, plus
+preservation of unrelated memberships and favorite state.

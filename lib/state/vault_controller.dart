@@ -817,6 +817,24 @@ class VaultController extends ChangeNotifier {
       await _commit(next, settings.copy(collections: names));
     },
   );
+  Future<void> updateCollectionMembership(
+    String name,
+    Map<int, bool> changes,
+  ) => _mutate(() async {
+    if (changes.isEmpty || !settings.collections.contains(name)) return;
+    await _commit([
+      for (final game in games)
+        if (changes[game.appId] case final selected?)
+          game.copy(
+            collections: selected
+                ? {...game.collections, name}.toList()
+                : game.collections.where((value) => value != name).toList(),
+          )
+        else
+          game,
+    ], settings);
+  });
+
   Future<void> deleteCollection(String name) => _mutate(() async {
     await _commit(
       games

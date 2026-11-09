@@ -273,11 +273,6 @@ class _DetailsPageState extends State<DetailsPage> {
               child: Text(allSessions ? 'Show less' : 'View all sessions'),
             ),
           ),
-        TrackingControls(
-          controller: c,
-          game: g,
-          section: TrackingSection.collections,
-        ),
         SizedBox(height: gap),
         ExpansionTile(
           key: const PageStorageKey('gameSettings'),

@@ -7,7 +7,7 @@ import 'components.dart';
 
 import 'steam_update_indicator.dart';
 
-enum TrackingSection { summary, collections, settings }
+enum TrackingSection { summary, settings }
 
 class TrackingControls extends StatelessWidget {
   const TrackingControls({
@@ -109,34 +109,6 @@ class TrackingControls extends StatelessWidget {
                 ],
               ),
             ],
-          ),
-        ],
-        if (section == TrackingSection.collections) ...[
-          const SizedBox(height: 24),
-          const SectionTitle('Collections'),
-          if (c.settings.collections.isEmpty)
-            const Text(
-              'Create a collection from the sidebar to organize this game.',
-            ),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: c.settings.collections
-                .map(
-                  (name) => FilterChip(
-                    label: Text(name),
-                    selected: g.collections.contains(name),
-                    onSelected: (selected) => c.update(
-                      g.appId,
-                      (v) => v.copy(
-                        collections: selected
-                            ? {...v.collections, name}.toList()
-                            : v.collections.where((n) => n != name).toList(),
-                      ),
-                    ),
-                  ),
-                )
-                .toList(),
           ),
         ],
       ],
